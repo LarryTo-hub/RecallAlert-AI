@@ -26,3 +26,5 @@ Files
 - `src/notifier.py`: notification helper stubs
 - `src/main.py`: simple runner / FastAPI app
 
+Security note: commit `.env.example` to the repository so others know which variables are required, but never commit your real `.env` file with secrets. `.env` is in `.gitignore` by default.
+
