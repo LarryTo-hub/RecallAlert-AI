@@ -2,6 +2,8 @@
 
 RecallAlert-AI is an autonomous agent that monitors FDA/USDA food recalls and delivers timely alerts. It can be extended to provide translated alerts, photo-based pantry verification, and actionable guidance in users' preferred languages.
 
+Each year, an estimated 48 million people in the United States—roughly 1 in 6—suffer from foodborne illness, leading to 128,000 hospitalizations and 3,000 deaths. While food recalls are meant to mitigate risk, more people were specifically sickened by recalled food in 2024/2025, a 25% increase in confirmed cases from the previous year. This project aims to help mitigate that risk by improving recall detection and timely notification.
+
 Quickstart
 
 1. Create and activate a Python 3.11+ virtualenv:
