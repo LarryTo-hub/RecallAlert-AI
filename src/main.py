@@ -14,11 +14,27 @@ def run_once():
     items = fetch_fda_recalls(10)
     logger.info("Fetched %d items", len(items))
     new_count = 0
+
     for it in items:
         saved = save_if_new(it)
+
         if saved:
             new_count += 1
-            notify_stub(f"Recall: {saved.recall_number}", saved.product_description or "", [])
+
+            # Handle both SQLite (SQLModel object) and Firestore (dict)
+            if hasattr(saved, "recall_number"):
+                recall_number = saved.recall_number
+                product_desc = saved.product_description
+            else:
+                recall_number = saved.get("recall_number")
+                product_desc = saved.get("product_description")
+
+            notify_stub(
+                f"Recall: {recall_number}",
+                product_desc or "",
+                []
+            )
+
     logger.info("New records saved: %d", new_count)
 
 
