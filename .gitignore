@@ -17,3 +17,9 @@ venv/
 
 # Database
 *.db
+
+# Secrets
+secrets/
+
+
+recalls.db
