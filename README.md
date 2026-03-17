@@ -120,7 +120,6 @@ Fetches the latest 5 FDA + USDA recalls and saves them to `demo/recalls_demo.jso
 - `.env.example` is safe to commit as a template
 - For production, use a secrets manager (GitHub Secrets / Azure Key Vault)
 
-## License
+## Licenses
 
-MIT
-
+N/A
