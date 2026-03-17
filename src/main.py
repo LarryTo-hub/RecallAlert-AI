@@ -30,7 +30,7 @@ def run_once():
                 product_desc = saved.get("product_description")
 
             notify_stub(
-                f"Recall: {recall_number}",
+                f"Recall: {recall_number or 'N/A'}",
                 product_desc or "",
                 []
             )

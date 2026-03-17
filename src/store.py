@@ -8,6 +8,7 @@ Supports:
 from __future__ import annotations
 
 import os
+import hashlib
 from typing import Optional, Dict, Any
 
 from dotenv import load_dotenv
@@ -17,6 +18,19 @@ STORE_BACKEND = os.getenv("STORE_BACKEND", "sqlite").lower()
 
 # ---------- Firebase / Firestore ----------
 _firestore_client = None
+
+
+def _fallback_id(record: Dict[str, Any]) -> str:
+    """Build a stable ID when recall_number is missing."""
+    parts = [
+        str(record.get("source") or ""),
+        str(record.get("report_date") or record.get("recall_initiation_date") or ""),
+        str(record.get("product_description") or ""),
+        str(record.get("reason_for_recall") or ""),
+        str(record.get("company_name") or record.get("recalling_firm") or ""),
+    ]
+    digest = hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()[:16]
+    return f"fallback-{digest}"
 
 def _init_firestore() -> None:
     """Initialize Firebase Admin + Firestore client once."""
@@ -40,14 +54,13 @@ def _init_firestore() -> None:
 
 
 def _firestore_save_if_new(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Save recall to Firestore if not already present (doc id = recall_number)."""
+    """Save recall to Firestore if not already present (doc id = stable external id)."""
     _init_firestore()
 
     recall_number = record.get("recall_number")
-    if not recall_number:
-        return None
+    doc_id = str(recall_number or _fallback_id(record))
 
-    doc_ref = _firestore_client.collection("recalls").document(str(recall_number))
+    doc_ref = _firestore_client.collection("recalls").document(doc_id)
     snap = doc_ref.get()
     if snap.exists:
         return None
@@ -55,6 +68,7 @@ def _firestore_save_if_new(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     doc_ref.set(
         {
             "recall_number": recall_number,
+            "external_id": doc_id,
             "reason_for_recall": record.get("reason_for_recall"),
             "product_description": record.get("product_description"),
             "recall_initiation_date": record.get("recall_initiation_date"),
@@ -81,12 +95,28 @@ def _sqlite_init_db() -> None:
 
 def _sqlite_save_if_new(record: dict) -> Optional[Recall]:
     with Session(_engine) as sess:
-        q = select(Recall).where(Recall.recall_number == record.get("recall_number"))
-        existing = sess.exec(q).first()
-        if existing:
-            return None
+        recall_number = str(record.get("recall_number") or "").strip()
+
+        if recall_number:
+            q = select(Recall).where(Recall.recall_number == recall_number)
+            existing = sess.exec(q).first()
+            if existing:
+                return None
+        else:
+            # Fallback dedupe path for sources without official recall numbers.
+            q = select(Recall).where(
+                Recall.product_description == (record.get("product_description") or ""),
+                Recall.reason_for_recall == (record.get("reason_for_recall") or ""),
+                Recall.recall_initiation_date == (record.get("recall_initiation_date") or ""),
+            )
+            existing = sess.exec(q).first()
+            if existing:
+                return None
+
+        stored_recall_number = recall_number or _fallback_id(record)
+
         r = Recall(
-            recall_number=record.get("recall_number", ""),
+            recall_number=stored_recall_number,
             reason_for_recall=record.get("reason_for_recall", ""),
             product_description=record.get("product_description", ""),
             recall_initiation_date=record.get("recall_initiation_date", ""),
