@@ -70,7 +70,7 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and add:
 #   GOOGLE_API_KEY=your-gemini-key      (from https://aistudio.google.com/app/apikey)
-#   TELEGRAM_BOT_TOKEN=your-bot-token   (from @BotFather on Telegram)
+#   TELEGRAM_BOT_TOKEN=your-bot-token   (from @BotFather on Telegram → /newbot)
 ```
 
 ### 3. Run the agent
@@ -79,7 +79,7 @@ cp .env.example .env
 python run.py
 ```
 
-This starts both the background polling loop and the Telegram bot. Open Telegram and message your bot:
+This starts both the background polling loop and the Telegram bot. Open Telegram and message **[@Recall_AlertAI_Bot](https://t.me/Recall_AlertAI_Bot)**:
 - `/start` — register and choose language
 - `/add Chicken nuggets` — add items to your pantry
 - Send a **receipt photo** — OCR extracts products automatically
@@ -105,6 +105,19 @@ Fetches the latest 5 FDA + USDA recalls and saves them to `demo/recalls_demo.jso
 | `FETCH_INTERVAL_MINUTES` | No | Polling interval (default: `60`) |
 | `LOG_LEVEL` | No | Logging level (default: `INFO`) |
 
+## Creating Your Own Telegram Bot
+
+To use this system, you'll need your own Telegram bot token:
+
+1. Open Telegram and search for **@BotFather**
+2. Send `/newbot`
+3. Choose a bot name (e.g., "My Recall AI Bot")
+4. Choose a username ending in `bot` (e.g., `my_recall_ai_bot`)
+5. BotFather replies with your token — copy it and paste into `.env` as `TELEGRAM_BOT_TOKEN`
+6. (Optional) Use `/setcommands` with BotFather to set up command descriptions
+
+The token is free and never expires unless you revoke it.
+
 ## Tech Stack
 
 - **Python 3.11+**
@@ -119,8 +132,4 @@ Fetches the latest 5 FDA + USDA recalls and saves them to `demo/recalls_demo.jso
 - `.env` is in `.gitignore` — never commit API keys
 - `.env.example` is safe to commit as a template
 - For production, use a secrets manager (GitHub Secrets / Azure Key Vault)
-
-## License
-
-MIT
 
