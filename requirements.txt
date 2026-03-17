@@ -8,3 +8,6 @@ sqlmodel
 apscheduler
 twilio
 firebase-admin
+google-genai
+python-telegram-bot
+Pillow
