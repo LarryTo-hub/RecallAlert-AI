@@ -132,4 +132,3 @@ The token is free and never expires unless you revoke it.
 - `.env` is in `.gitignore` — never commit API keys
 - `.env.example` is safe to commit as a template
 - For production, use a secrets manager (GitHub Secrets / Azure Key Vault)
-
