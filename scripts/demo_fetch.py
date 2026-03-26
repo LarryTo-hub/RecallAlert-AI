@@ -34,11 +34,13 @@ def run_demo(limit: int = 5):
     for i, item in enumerate(fda_items, 1):
         status = item.get("status") or "N/A"
         date_value = item.get("report_date") or "N/A"
+        brand_name = item.get("brand_name") or item.get("brand_names") or "N/A"
         company_name = item.get("company_name") or "N/A"
         affected_area = item.get("affected_area") or "N/A"
         product_description = (item.get("product_description") or "")[:60]
         print(
             f"{i}. Product: {product_description} | "
+            f"Brand(s): {brand_name} | "
             f"Active: {status} | "
             f"Date: {date_value} | "
             f"Company: {company_name} | "

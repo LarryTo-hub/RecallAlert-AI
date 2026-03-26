@@ -9,6 +9,8 @@ from typing import Any, Dict, List
 
 from pathlib import Path
 from dotenv import load_dotenv
+import langchain
+import langgraph
 
 # Ensure .env is loaded from the project root regardless of cwd
 _env_path = Path(__file__).resolve().parent.parent / ".env"
