@@ -1,0 +1,241 @@
+{
+  "fda": [
+    {
+      "source": "FDA-web",
+      "recall_number": null,
+      "brand_name": "Boner Bear, Red Bull and Blue Bull",
+      "brand_names": "Boner Bear, Red Bull and Blue Bull",
+      "product_description": "Honey dietary supplement",
+      "product_type": "Dietary Supplements, Food & Beverages",
+      "reason_for_recall": "Product contains sildenafil and tadalafil",
+      "company_name": "Pure Vitamins and Natural Supplements, LLC",
+      "status": "ACTIVE",
+      "affected_area": null,
+      "report_date": "03/14/2026",
+      "recall_initiation_date": "03/14/2026",
+      "url": "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts",
+      "raw": {
+        "date": "03/14/2026",
+        "brand_names": "Boner Bear, Red Bull and Blue Bull",
+        "product_description": "Honey dietary supplement",
+        "product_type": "Dietary Supplements, Food & Beverages",
+        "reason_for_recall": "Product contains sildenafil and tadalafil",
+        "company_name": "Pure Vitamins and Natural Supplements, LLC",
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "source": "FDA-web",
+      "recall_number": null,
+      "brand_name": "Omnipod",
+      "brand_names": "Omnipod",
+      "product_description": "Alternate controller enabled insulin infusion pump",
+      "product_type": "Medical Devices",
+      "reason_for_recall": "Pods may have a small tear in the internal tubing that delivers insulin. This may leak inside the Pod instead of being fully infused into the body as intended.",
+      "company_name": "Insulet Corporation",
+      "status": "ACTIVE",
+      "affected_area": null,
+      "report_date": "03/13/2026",
+      "recall_initiation_date": "03/13/2026",
+      "url": "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts",
+      "raw": {
+        "date": "03/13/2026",
+        "brand_names": "Omnipod",
+        "product_description": "Alternate controller enabled insulin infusion pump",
+        "product_type": "Medical Devices",
+        "reason_for_recall": "Pods may have a small tear in the internal tubing that delivers insulin. This may leak inside the Pod instead of being fully infused into the body as intended.",
+        "company_name": "Insulet Corporation",
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "source": "FDA-web",
+      "recall_number": null,
+      "brand_name": "Favorina",
+      "brand_names": "Favorina",
+      "product_description": "Chocolate Ladybugs - German-Style Nougat Candy",
+      "product_type": "Food & Beverages, Allergens",
+      "reason_for_recall": "Undeclared hazelnut allergen",
+      "company_name": "Lidl US",
+      "status": "ACTIVE",
+      "affected_area": null,
+      "report_date": "03/12/2026",
+      "recall_initiation_date": "03/12/2026",
+      "url": "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts",
+      "raw": {
+        "date": "03/12/2026",
+        "brand_names": "Favorina",
+        "product_description": "Chocolate Ladybugs - German-Style Nougat Candy",
+        "product_type": "Food & Beverages, Allergens",
+        "reason_for_recall": "Undeclared hazelnut allergen",
+        "company_name": "Lidl US",
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "source": "FDA-web",
+      "recall_number": null,
+      "brand_name": "Primal Herbs",
+      "brand_names": "Primal Herbs",
+      "product_description": "Dietary supplement",
+      "product_type": "Dietary Supplements, Food & Beverages",
+      "reason_for_recall": "Product contains sildenafil",
+      "company_name": "Primal Supplements Group LLC",
+      "status": "ACTIVE",
+      "affected_area": null,
+      "report_date": "03/11/2026",
+      "recall_initiation_date": "03/11/2026",
+      "url": "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts",
+      "raw": {
+        "date": "03/11/2026",
+        "brand_names": "Primal Herbs",
+        "product_description": "Dietary supplement",
+        "product_type": "Dietary Supplements, Food & Beverages",
+        "reason_for_recall": "Product contains sildenafil",
+        "company_name": "Primal Supplements Group LLC",
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "source": "FDA-web",
+      "recall_number": null,
+      "brand_name": "Miss Vickie\u2019s",
+      "brand_names": "Miss Vickie\u2019s",
+      "product_description": "Spicy Dill Pickle Potato Chips",
+      "product_type": "Food & Beverages",
+      "reason_for_recall": "Undeclared milk allergen",
+      "company_name": "Frito-Lay",
+      "status": "ACTIVE",
+      "affected_area": null,
+      "report_date": "03/04/2026",
+      "recall_initiation_date": "03/04/2026",
+      "url": "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts",
+      "raw": {
+        "date": "03/04/2026",
+        "brand_names": "Miss Vickie\u2019s",
+        "product_description": "Spicy Dill Pickle Potato Chips",
+        "product_type": "Food & Beverages",
+        "reason_for_recall": "Undeclared milk allergen",
+        "company_name": "Frito-Lay",
+        "status": "ACTIVE"
+      }
+    }
+  ],
+  "usda": [
+    {
+      "source": "USDA-mirror",
+      "recall_number": null,
+      "brand_name": null,
+      "product_description": "FSIS Issues Public Health Alert For Frozen Ready-To-Eat Turkey Stuffed Pastry Products Due To Misbranding",
+      "product_type": "Food",
+      "reason_for_recall": "WASHINGTON, March 13, 2026 \u2013 The U.S. Department of Agriculture\u2019s Food Safety and Inspection Service (FSIS) is issuing a public health alert for frozen ready-to-eat turkey stuffed pastry products due to misbranding. Some boxes of the turkey, pesto, and cheese stuffed pastries contain ham and...",
+      "company_name": "Shaw Bakers LLC",
+      "status": "ACTIVE",
+      "affected_area": "MIDWEST",
+      "report_date": "Fri, 03/13/2026",
+      "recall_initiation_date": "Fri, 03/13/2026",
+      "url": "http://www.fsis.usda.gov/recalls-alerts/fsis-issues-public-health-alert-frozen-ready-eat-turkey-stuffed-pastry-products-due",
+      "raw": {
+        "title": "FSIS Issues Public Health Alert For Frozen Ready-To-Eat Turkey Stuffed Pastry Products Due To Misbranding",
+        "link": "http://www.fsis.usda.gov/recalls-alerts/fsis-issues-public-health-alert-frozen-ready-eat-turkey-stuffed-pastry-products-due",
+        "company_name": "Shaw Bakers LLC",
+        "status": "ACTIVE",
+        "report_date": "Fri, 03/13/2026",
+        "affected_area": "MIDWEST",
+        "reason_for_recall": "WASHINGTON, March 13, 2026 \u2013 The U.S. Department of Agriculture\u2019s Food Safety and Inspection Service (FSIS) is issuing a public health alert for frozen ready-to-eat turkey stuffed pastry products due to misbranding. Some boxes of the turkey, pesto, and cheese stuffed pastries contain ham and..."
+      }
+    },
+    {
+      "source": "USDA-mirror",
+      "recall_number": null,
+      "brand_name": null,
+      "product_description": "FSIS Issues Public Health Alert for Ready-To-Eat Beef Jerky Products Due to Misbranding and Undeclared Allergen",
+      "product_type": "Food",
+      "reason_for_recall": "WASHINGTON, March 1, 2026 \u2013 The U.S. Department of Agriculture's Food Safety and Inspection Service (FSIS) is issuing a public health alert for beef jerky products due to misbranding and undeclared allergens. The products may contain soy lecithin, a known allergen, which is not declared...",
+      "company_name": "Punahele Jerky Company, Inc.",
+      "status": "ACTIVE",
+      "affected_area": "NATIONWIDE",
+      "report_date": "Sun, 03/01/2026",
+      "recall_initiation_date": "Sun, 03/01/2026",
+      "url": "http://www.fsis.usda.gov/recalls-alerts/fsis-issues-public-health-alert-ready-eat-beef-jerky-products-due-misbranding-and",
+      "raw": {
+        "title": "FSIS Issues Public Health Alert for Ready-To-Eat Beef Jerky Products Due to Misbranding and Undeclared Allergen",
+        "link": "http://www.fsis.usda.gov/recalls-alerts/fsis-issues-public-health-alert-ready-eat-beef-jerky-products-due-misbranding-and",
+        "company_name": "Punahele Jerky Company, Inc.",
+        "status": "ACTIVE",
+        "report_date": "Sun, 03/01/2026",
+        "affected_area": "NATIONWIDE",
+        "reason_for_recall": "WASHINGTON, March 1, 2026 \u2013 The U.S. Department of Agriculture's Food Safety and Inspection Service (FSIS) is issuing a public health alert for beef jerky products due to misbranding and undeclared allergens. The products may contain soy lecithin, a known allergen, which is not declared..."
+      }
+    },
+    {
+      "source": "USDA-mirror",
+      "recall_number": null,
+      "brand_name": null,
+      "product_description": "Ajinomoto Foods North America, Inc. Recalls Chicken Fried Rice Products Due to Possible Foreign Matter Contamination",
+      "product_type": "Food",
+      "reason_for_recall": null,
+      "company_name": "Ajinomoto Foods North America",
+      "status": "ACTIVE",
+      "affected_area": "NATIONWIDE",
+      "report_date": "Thu, 02/19/2026",
+      "recall_initiation_date": "Thu, 02/19/2026",
+      "url": "http://www.fsis.usda.gov/recalls-alerts/ajinomoto-foods-north-america-inc--recalls-chicken-fried-rice-products-due-0",
+      "raw": {
+        "title": "Ajinomoto Foods North America, Inc. Recalls Chicken Fried Rice Products Due to Possible Foreign Matter Contamination",
+        "link": "http://www.fsis.usda.gov/recalls-alerts/ajinomoto-foods-north-america-inc--recalls-chicken-fried-rice-products-due-0",
+        "company_name": "Ajinomoto Foods North America",
+        "status": "ACTIVE",
+        "report_date": "Thu, 02/19/2026",
+        "affected_area": "NATIONWIDE",
+        "reason_for_recall": null
+      }
+    },
+    {
+      "source": "USDA-mirror",
+      "recall_number": null,
+      "brand_name": null,
+      "product_description": "CS Beef Packers, LLC Recalls Ground Beef Products That May be Contaminated With E. Coli O145",
+      "product_type": "Food",
+      "reason_for_recall": "WASHINGTON, Feb. 11, 2026 \u2013 CS Beef Packers, LLC, a Kuna, Idaho establishment, is recalling approximately 22,912 pounds of raw ground beef products that may be contaminated with E. coli O145, the U.S. Department of Agriculture\u2019s Food Safety and Inspection Service (FSIS) announced today. The...",
+      "company_name": "CS Beef Packers, LLC",
+      "status": "ACTIVE",
+      "affected_area": null,
+      "report_date": "Wed, 02/11/2026",
+      "recall_initiation_date": "Wed, 02/11/2026",
+      "url": "http://www.fsis.usda.gov/recalls-alerts/cs-beef-packers-llc-recalls-ground-beef-products-may-be-contaminated-e--coli-o145",
+      "raw": {
+        "title": "CS Beef Packers, LLC Recalls Ground Beef Products That May be Contaminated With E. Coli O145",
+        "link": "http://www.fsis.usda.gov/recalls-alerts/cs-beef-packers-llc-recalls-ground-beef-products-may-be-contaminated-e--coli-o145",
+        "company_name": "CS Beef Packers, LLC",
+        "status": "ACTIVE",
+        "report_date": "Wed, 02/11/2026",
+        "affected_area": null,
+        "reason_for_recall": "WASHINGTON, Feb. 11, 2026 \u2013 CS Beef Packers, LLC, a Kuna, Idaho establishment, is recalling approximately 22,912 pounds of raw ground beef products that may be contaminated with E. coli O145, the U.S. Department of Agriculture\u2019s Food Safety and Inspection Service (FSIS) announced today. The..."
+      }
+    },
+    {
+      "source": "USDA-mirror",
+      "recall_number": null,
+      "brand_name": null,
+      "product_description": "Suzanna\u2019s Kitchen Recalls Ready-To-Eat Grilled Chicken Breast Fillet Products due to Possible Listeria Contamination",
+      "product_type": "Food",
+      "reason_for_recall": "WASHINGTON, Jan. 16, 2026 \u2013 Suzanna\u2019s Kitchen, a Norcross, Ga., establishment, is recalling approximately 13,720 pounds of ready- to-eat grilled chicken breast fillet products that may be adulterated with Listeria monocytogenes ( Lm), the U.S. Department of Agriculture\u2019s Food Safety and Inspection Service (FSIS) announced...",
+      "company_name": "Suzanna's Kitchen Inc",
+      "status": "CLOSED",
+      "affected_area": null,
+      "report_date": "Fri, 01/16/2026",
+      "recall_initiation_date": "Fri, 01/16/2026",
+      "url": "http://www.fsis.usda.gov/recalls-alerts/suzannas-kitchen-recalls-ready-eat-grilled-chicken-breast-fillet-products-due",
+      "raw": {
+        "title": "Suzanna\u2019s Kitchen Recalls Ready-To-Eat Grilled Chicken Breast Fillet Products due to Possible Listeria Contamination",
+        "link": "http://www.fsis.usda.gov/recalls-alerts/suzannas-kitchen-recalls-ready-eat-grilled-chicken-breast-fillet-products-due",
+        "company_name": "Suzanna's Kitchen Inc",
+        "status": "CLOSED",
+        "report_date": "Fri, 01/16/2026",
+        "affected_area": null,
+        "reason_for_recall": "WASHINGTON, Jan. 16, 2026 \u2013 Suzanna\u2019s Kitchen, a Norcross, Ga., establishment, is recalling approximately 13,720 pounds of ready- to-eat grilled chicken breast fillet products that may be adulterated with Listeria monocytogenes ( Lm), the U.S. Department of Agriculture\u2019s Food Safety and Inspection Service (FSIS) announced..."
+      }
+    }
+  ]
+}
