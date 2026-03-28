@@ -416,3 +416,65 @@ async def export_pantry(telegram_id: int = Query(DEMO_USER_ID)) -> StreamingResp
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=pantry.csv"},
     )
+
+
+# ── Chat endpoint ─────────────────────────────────────────────────────────
+
+class ChatMessage(BaseModel):
+    message: str
+    telegram_id: int = DEMO_USER_ID
+
+
+@app.post("/api/chat")
+async def chat_with_bot(body: ChatMessage) -> Dict[str, Any]:
+    if not body.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    # Build recall context from in-memory cache (top 5 active recalls)
+    active_recalls = [
+        r for r in _recalls_cache if (r.get("status") or "").upper() == "ACTIVE"
+    ][:5]
+    recall_context = ""
+    if active_recalls:
+        recall_context = "Current active recalls:\n"
+        for r in active_recalls:
+            recall_context += (
+                f"- {r.get('product_description', 'Unknown')} "
+                f"[{r.get('source', '')}]: {r.get('reason_for_recall', '')}\n"
+            )
+
+    # Build pantry context for the requesting user
+    pantry_context = ""
+    try:
+        user = _resolve_user(body.telegram_id)
+        pantry = get_pantry(user.id)
+        if pantry:
+            pantry_context = "\nUser's pantry items: " + ", ".join(
+                i.product_name for i in pantry
+            )
+    except Exception:
+        pass
+
+    prompt = (
+        "You are RecallAlert AI, a concise food safety assistant embedded in a web app. "
+        "Answer questions about food recalls, disposal instructions, and pantry safety. "
+        "If asked about specific products, reference the recall data provided. "
+        "Keep answers under 120 words and use plain language.\n\n"
+        f"{recall_context}{pantry_context}\n\n"
+        f"User question: {body.message}"
+    )
+
+    try:
+        client = agent._get_client()
+        resp = await asyncio.to_thread(
+            client.models.generate_content,
+            model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+            contents=prompt,
+        )
+        return {"reply": resp.text.strip()}
+    except RuntimeError as e:
+        # GOOGLE_API_KEY not set
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.exception("Chat endpoint error")
+        raise HTTPException(status_code=503, detail="AI unavailable")
