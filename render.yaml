@@ -4,7 +4,7 @@ services:
     name: recallalert-api
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    startCommand: python -m uvicorn src.main_api:app --host 0.0.0.0 --port $PORT
     plan: starter          # upgrade to avoid sleep-on-inactivity
     envVars:
       - key: GOOGLE_API_KEY
