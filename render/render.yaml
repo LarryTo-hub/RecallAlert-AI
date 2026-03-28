@@ -1,0 +1,55 @@
+services:
+  # Web service: FastAPI API + Polling loop
+  - type: web
+    name: recall-alert-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn src.main_api:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: STORE_BACKEND
+        value: firebase
+      - key: PORT
+        value: "10000"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: FETCH_INTERVAL_MINUTES
+        value: "60"
+      # Secrets (set in Render dashboard)
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: FIREBASE_CRED_PATH
+        value: /tmp/firebase-cred.json
+      - key: ALLOWED_ORIGINS
+        value: https://your-frontend.vercel.app,http://localhost:3000
+    diskSize: 1  # GB
+    plan: starter
+
+  # Background worker: Polling service
+  - type: background_worker
+    name: recall-alert-poller
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m src.polling_worker
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: STORE_BACKEND
+        value: firebase
+      - key: LOG_LEVEL
+        value: INFO
+      - key: FETCH_INTERVAL_MINUTES
+        value: "60"
+      # Secrets (same as web service)
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: FIREBASE_CRED_PATH
+        value: /tmp/firebase-cred.json
+    plan: starter

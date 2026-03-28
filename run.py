@@ -17,7 +17,7 @@ logger = logging.getLogger("recall-agent")
 
 async def main() -> None:
     from src.models import init_models_db
-    from src.store import init_db
+    from src.store import init_db, cleanup
     from src.bot import build_bot
     from src.polling import create_scheduler, set_telegram_app, poll_and_alert
 
@@ -49,12 +49,15 @@ async def main() -> None:
         stop_event = asyncio.Event()
         await stop_event.wait()
     except (KeyboardInterrupt, SystemExit):
-        pass
+        logger.info("Shutdown signal received…")
     finally:
+        logger.info("Performing cleanup…")
         scheduler.shutdown(wait=False)
         await app.updater.stop()
         await app.stop()
         await app.shutdown()
+        cleanup()  # Close database connections
+        logger.info("Shutdown complete.")
 
 
 if __name__ == "__main__":

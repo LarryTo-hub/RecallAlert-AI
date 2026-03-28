@@ -14,7 +14,11 @@ from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 load_dotenv()
 
-STORE_BACKEND = os.getenv("STORE_BACKEND", "sqlite").lower()
+# In production (Cloud Run, Cloud Functions), default to Firebase/Firestore
+# Local development defaults to SQLite
+ENV = os.getenv("ENVIRONMENT", "development").lower()
+DEFAULT_BACKEND = "firebase" if ENV == "production" else "sqlite"
+STORE_BACKEND = os.getenv("STORE_BACKEND", DEFAULT_BACKEND).lower()
 
 # ---------- Firebase / Firestore ----------
 _firestore_client = None
@@ -138,3 +142,27 @@ def save_if_new(record: dict):
     if STORE_BACKEND == "firebase":
         return _firestore_save_if_new(record)
     return _sqlite_save_if_new(record)
+
+
+def cleanup() -> None:
+    """Close all database connections (called on shutdown)."""
+    global _firestore_client
+    if _firestore_client is not None:
+        # Firestore clients don't need explicit close, but we clear reference
+        _firestore_client = None
+    # SQLite engine doesn't require explicit cleanup
+
+
+def get_all_recalls(skip: int = 0, limit: int = 20) -> list:
+    """Get paginated list of recalls from storage."""
+    if STORE_BACKEND == "firebase":
+        # For Firestore, query the recalls collection
+        docs = _firestore_client.collection("recalls").limit(limit).offset(skip).stream()
+        return [doc.to_dict() for doc in docs]
+    else:
+        # For SQLite
+        with Session(_engine) as sess:
+            recalls = sess.exec(
+                select(Recall).order_by(Recall.id.desc()).offset(skip).limit(limit)
+            ).all()
+            return list(recalls)

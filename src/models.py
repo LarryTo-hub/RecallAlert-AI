@@ -71,15 +71,19 @@ def get_or_create_user(telegram_id: int, language: str = "en") -> User:
         return user
 
 
-def set_user_language(telegram_id: int, language: str) -> User:
+def get_all_users() -> list[User]:
+    """Get all registered users."""
     with get_session() as sess:
-        user = sess.exec(select(User).where(User.telegram_id == telegram_id)).first()
+        return list(sess.exec(select(User)).all())
+
+
+def set_user_language(user_id: int, language: str) -> User:
+    with get_session() as sess:
+        user = sess.get(User, user_id)
         if not user:
-            user = User(telegram_id=telegram_id, language=language)
-            sess.add(user)
-        else:
-            user.language = language
-            sess.add(user)
+            raise ValueError(f"User {user_id} not found")
+        user.language = language
+        sess.add(user)
         sess.commit()
         sess.refresh(user)
         return user
@@ -120,6 +124,17 @@ def clear_pantry(user_id: int) -> int:
         return count
 
 
+def delete_pantry_item(user_id: int, item_id: int) -> bool:
+    """Delete a specific pantry item for a user. Returns True if deleted."""
+    with get_session() as sess:
+        item = sess.get(PantryItem, item_id)
+        if not item or item.user_id != user_id:
+            return False
+        sess.delete(item)
+        sess.commit()
+        return True
+
+
 # ── Alert helpers ─────────────────────────────────────────────────────────
 
 def create_alert(user_id: int, recall_number: str | None,
@@ -137,10 +152,10 @@ def create_alert(user_id: int, recall_number: str | None,
         return alert
 
 
-def update_alert_feedback(alert_id: int, feedback: str) -> Alert | None:
+def update_alert_feedback(user_id: int, alert_id: int, feedback: str) -> Alert | None:
     with get_session() as sess:
         alert = sess.get(Alert, alert_id)
-        if not alert:
+        if not alert or alert.user_id != user_id:
             return None
         alert.status = feedback
         alert.responded_at = datetime.now(timezone.utc).isoformat()
@@ -148,6 +163,16 @@ def update_alert_feedback(alert_id: int, feedback: str) -> Alert | None:
         sess.commit()
         sess.refresh(alert)
         return alert
+
+
+def get_alerts(user_id: int, limit: int = 50) -> list[Alert]:
+    """Get recent alerts for a user."""
+    with get_session() as sess:
+        return list(
+            sess.exec(
+                select(Alert).where(Alert.user_id == user_id).order_by(Alert.created_at.desc()).limit(limit)
+            ).all()
+        )
 
 
 def get_all_users() -> list[User]:

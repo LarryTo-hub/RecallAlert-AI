@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -25,43 +24,22 @@ logger = logging.getLogger(__name__)
 
 FETCH_INTERVAL = int(os.getenv("FETCH_INTERVAL_MINUTES", "60"))
 
-# Will be set by run.py so the polling loop can push Telegram messages.
-_telegram_app = None
 
-
-def set_telegram_app(app) -> None:
-    """Register the running Telegram Application so alerts can be sent."""
-    global _telegram_app
-    _telegram_app = app
-
-
-async def _send_telegram_alert(telegram_id: int, text: str, alert_id: int) -> None:
-    """Send an alert message via Telegram with feedback buttons."""
-    if _telegram_app is None:
-        logger.warning("Telegram app not set; cannot send alert to %s", telegram_id)
-        return
-
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("✅ Disposed", callback_data=f"feedback:disposed:{alert_id}"),
-            InlineKeyboardButton("❌ Ignored", callback_data=f"feedback:ignored:{alert_id}"),
-        ]
-    ])
-
+async def broadcast_alert(user_id: int, alert_message: dict):
+    """Broadcast alert to user via WebSocket if connected.
+    
+    This will be called by polling loop when alerts match user's pantry.
+    If user is connected via WebSocket, they'll receive the alert in real-time.
+    """
     try:
-        await _telegram_app.bot.send_message(
-            chat_id=telegram_id,
-            text=text,
-            reply_markup=keyboard,
-        )
-    except Exception:
-        logger.exception("Failed to send Telegram alert to %s", telegram_id)
+        from src.api import broadcast_alert as api_broadcast
+        await api_broadcast(user_id, alert_message)
+    except Exception as e:
+        logger.exception("Failed to broadcast alert to user %d: %s", user_id, e)
 
 
 async def poll_and_alert() -> None:
-    """One polling cycle: fetch recalls, match pantries, send alerts."""
+    """One polling cycle: fetch recalls, match pantries, send alerts via WebSocket."""
     logger.info("Polling for new recalls…")
 
     init_db()
@@ -91,6 +69,7 @@ async def poll_and_alert() -> None:
         logger.info("No registered users yet.")
         return
 
+    alert_count = 0
     for recall_record, saved_obj in new_recalls:
         parsed = parse_recall(recall_record)
 
@@ -120,23 +99,21 @@ async def poll_and_alert() -> None:
                 recall_id=saved_id,
             )
 
-            # 4. Send via Telegram
-            await _send_telegram_alert(user.telegram_id, alert_text, alert.id)
+            # 4. Broadcast via WebSocket (if user is connected)
+            alert_payload = {
+                "type": "recall_alert",
+                "alert_id": alert.id,
+                "recall_number": recall_number or "N/A",
+                "message": alert_text,
+                "products": parsed.get("products", []),
+                "severity": parsed.get("severity", "unknown"),
+            }
+            await broadcast_alert(user.id, alert_payload)
+            alert_count += 1
+
             logger.info(
-                "Alert #%d sent to user %d (telegram %d) for recall %s",
-                alert.id, user.id, user.telegram_id,
-                recall_number or "N/A",
+                "Alert #%d created for user %d for recall %s",
+                alert.id, user.id, recall_number or "N/A",
             )
 
-
-def create_scheduler() -> AsyncIOScheduler:
-    """Create an APScheduler instance with the polling job."""
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(
-        poll_and_alert,
-        trigger="interval",
-        minutes=FETCH_INTERVAL,
-        id="recall_poll",
-        replace_existing=True,
-    )
-    return scheduler
+    logger.info("Polling cycle complete. Created %d alerts.", alert_count)

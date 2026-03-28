@@ -1,0 +1,54 @@
+# Cloud Run service definition
+# Deploy with: gcloud run deploy recall-alert-bot --source . --region us-central1
+
+kind: Service
+apiVersion: serving.knative.dev/v1
+metadata:
+  name: recall-alert-bot
+  annotations:
+    serving.knative.dev/creator: recall-bot-deployment
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/cpus: "2"
+        run.googleapis.com/memory: "512Mi"
+        run.googleapis.com/timeout: "300"
+    spec:
+      containers:
+      - image: gcr.io/PROJECT_ID/recall-alert-bot:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: STORE_BACKEND
+          value: "firebase"
+        - name: GOOGLE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: gemini-api-key
+              key: api-key
+        - name: TELEGRAM_BOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: telegram-token
+              key: token
+        - name: FIREBASE_CRED_PATH
+          value: "/secrets/firebase-cred.json"
+        volumeMounts:
+        - name: firebase-cred
+          mountPath: /secrets
+        resources:
+          limits:
+            cpu: "2"
+            memory: "512Mi"
+      volumes:
+      - name: firebase-cred
+        secret:
+          secretName: firebase-cred
+  traffic:
+  - percent: 100
+    latestRevision: true
