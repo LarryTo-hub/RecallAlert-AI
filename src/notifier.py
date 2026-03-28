@@ -1,10 +1,43 @@
-"""Simple notifier stubs. Replace with real senders (SMTP, Twilio, webhooks).
-"""
 import logging
 import os
+import smtplib
+from email.message import EmailMessage
 from typing import List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+def send_email_smtp(subject: str, body: str, to_email: str) -> bool:
+    """Send a plain-text email via Gmail SMTP (App Password).
+    Requires SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS in .env.
+    """
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "").strip()
+    smtp_pass = os.getenv("SMTP_PASS", "").strip()
+    allow_send = os.getenv("ALLOW_SEND", "false").lower() == "true"
+
+    if not (smtp_user and smtp_pass):
+        raise RuntimeError("SMTP_USER and SMTP_PASS must be set in .env.")
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = smtp_user
+    msg["To"] = to_email
+    msg.set_content(body)
+
+    if not allow_send:
+        logger.info("[DRY-RUN] Would send email to %s — subject: %r", to_email, subject)
+        return True
+
+    with smtplib.SMTP(smtp_host, smtp_port) as server:
+        server.ehlo()
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.send_message(msg)
+
+    logger.info("Email sent to %s", to_email)
+    return True
 
 
 def notify_stub(subject: str, body: str, recipients: List[str]):
@@ -73,8 +106,6 @@ def send_sms_via_email_gateway(number: str, carrier_domain: str, body: str) -> b
 
 def notify_sms(body: str, to: Optional[str] = None, method: Optional[str] = None, **kwargs):
     """Unified SMS notifier. method selects 'twilio' or 'email_gateway'.
-
-    If method is None, picks based on NOTIFIER_BACKEND env var.
     """
     method = method or os.getenv("NOTIFIER_BACKEND", "twilio")
     if method == "twilio":
