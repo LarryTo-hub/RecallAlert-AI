@@ -8,11 +8,15 @@ Supports:
 from __future__ import annotations
 
 import os
+import re
 import hashlib
+import logging
 from typing import Optional, Dict, Any
 
 from dotenv import load_dotenv
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 # In production (Cloud Run, Cloud Functions), default to Firebase/Firestore
 # Local development defaults to SQLite
@@ -40,10 +44,11 @@ def _fallback_id(record: Dict[str, Any]) -> str:
 def _sanitize_doc_id(doc_id: str) -> str:
     """Sanitize doc_id for Firestore (remove invalid characters)."""
     # Firestore allows: alphanumeric, underscore, hyphen
-    import re
     sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', str(doc_id))
     # Ensure it's not empty
-    return sanitized or "doc"
+    result = sanitized or "doc"
+    logger.debug(f"Sanitized doc_id: {doc_id} -> {result}")
+    return result
 
 def _init_firestore() -> None:
     """Initialize Firebase Admin + Firestore client once."""
@@ -87,9 +92,16 @@ def _firestore_save_if_new(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     _init_firestore()
 
     recall_number = record.get("recall_number")
-    doc_id = _sanitize_doc_id(str(recall_number or _fallback_id(record)))
-
-    doc_ref = _firestore_client.collection("recalls").document(doc_id)
+    raw_doc_id = str(recall_number or _fallback_id(record))
+    doc_id = _sanitize_doc_id(raw_doc_id)
+    
+    logger.info(f"Saving recall with doc_id={doc_id} (raw={raw_doc_id})")
+    
+    try:
+        doc_ref = _firestore_client.collection("recalls").document(doc_id)
+    except ValueError as e:
+        logger.error(f"Invalid doc_id '{doc_id}': {e}")
+        raise
     snap = doc_ref.get()
     if snap.exists:
         return None
