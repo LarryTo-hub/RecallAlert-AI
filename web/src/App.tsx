@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import NavBar from "@/components/NavBar";
 import InstallPrompt from "@/components/InstallPrompt";
+import ChatBot from "@/components/ChatBot";
 import Dashboard from "@/pages/Dashboard";
 import Pantry from "@/pages/Pantry";
 import Alerts from "@/pages/Alerts";
@@ -32,6 +33,7 @@ export default function App() {
         <NavBar variant="bottom" />
 
         <InstallPrompt />
+        <ChatBot />
       </div>
     </BrowserRouter>
   );
