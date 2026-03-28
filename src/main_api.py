@@ -91,6 +91,13 @@ async def run_polling_loop():
 
 # Create FastAPI app with lifespan
 from src.api import app
+from fastapi.staticfiles import StaticFiles
+
+# Serve React app static files
+web_dist = Path(__file__).resolve().parent.parent / "web" / "dist"
+if web_dist.exists():
+    app.mount("/", StaticFiles(directory=web_dist, html=True), name="static")
+    logger.info("📁 Mounted React static files from %s", web_dist)
 
 app.router.lifespan_context = lifespan
 
