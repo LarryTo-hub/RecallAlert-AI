@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getTelegramId } from "@/api/client";
+import { sendChatMessage } from "@/api/client";
 
 interface Message {
   role: "user" | "bot";
@@ -7,17 +7,8 @@ interface Message {
 }
 
 async function sendChat(message: string): Promise<string> {
-  const res = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, telegram_id: getTelegramId() }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Request failed" }));
-    throw new Error(err.detail ?? "Request failed");
-  }
-  const data = await res.json();
-  return data.reply as string;
+  const data = await sendChatMessage(message);
+  return data.reply;
 }
 
 const WELCOME: Message = {

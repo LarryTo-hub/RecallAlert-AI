@@ -196,3 +196,12 @@ export async function saveNotificationSettings(body: {
 export async function fetchStats(): Promise<Stats> {
   return request(`/api/stats?telegram_id=${getTelegramId()}`);
 }
+
+// ── Chat (AI) ──────────────────────────────────────────────────────────────
+
+export async function sendChatMessage(message: string): Promise<{ reply: string }> {
+  return request("/chat", {
+    method: "POST",
+    body: JSON.stringify({ message, telegram_id: getTelegramId() }),
+  });
+}
