@@ -1,0 +1,57 @@
+services:
+  # ── FastAPI backend ─────────────────────────────────────────────────────
+  - type: web
+    name: recallalert-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    plan: starter          # upgrade to avoid sleep-on-inactivity
+    envVars:
+      - key: GOOGLE_API_KEY
+        sync: false        # set in Render dashboard
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: STORE_BACKEND
+        value: firebase    # use firebase to avoid ephemeral SQLite loss
+      - key: FIREBASE_CRED_PATH
+        sync: false        # path to uploaded creds file, or use FIREBASE_CRED_JSON
+      - key: ALLOW_SEND
+        value: "true"
+      - key: FETCH_INTERVAL_MINUTES
+        value: "60"
+      - key: FRONTEND_ORIGIN
+        sync: false        # set to your Render static site URL e.g. https://recallalert.onrender.com
+      - key: LOG_LEVEL
+        value: INFO
+      # Optional Twilio SMS
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+
+  # ── React PWA (static site) ─────────────────────────────────────────────
+  - type: web
+    name: recallalert-web
+    runtime: static
+    buildCommand: cd web && npm install && npm run build
+    staticPublishPath: web/dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /manifest.json
+        name: Cache-Control
+        value: public, max-age=0
+    routes:
+      # SPA fallback — all paths served by index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        sync: false        # set to your API service URL e.g. https://recallalert-api.onrender.com
