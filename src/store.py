@@ -44,13 +44,29 @@ def _init_firestore() -> None:
 
     import firebase_admin
     from firebase_admin import credentials, firestore
+    import base64
+    import json
+    import tempfile
 
     if not firebase_admin._apps:
         cred_path = os.getenv("FIREBASE_CRED_PATH")
         if not cred_path:
             raise RuntimeError("FIREBASE_CRED_PATH is not set in .env")
+        
+        # Check if it's a base64-encoded JSON (from Render environment variable)
         if not os.path.exists(cred_path):
-            raise RuntimeError(f"Firebase cred file not found at: {cred_path}")
+            try:
+                # Try to decode as base64
+                cred_json = base64.b64decode(cred_path).decode("utf-8")
+                # Verify it's valid JSON
+                json.loads(cred_json)
+                # Write to a temporary file
+                with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
+                    f.write(cred_json)
+                    cred_path = f.name
+            except (base64.binascii.Error, UnicodeDecodeError, json.JSONDecodeError):
+                raise RuntimeError(f"Firebase cred file not found at: {cred_path} and could not decode as base64")
+        
         cred = credentials.Certificate(cred_path)
         firebase_admin.initialize_app(cred)
 
