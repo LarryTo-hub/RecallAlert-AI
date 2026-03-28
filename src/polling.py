@@ -19,6 +19,7 @@ from src.models import (
     create_alert,
 )
 from src.agent import parse_recall, match_pantry, generate_alert
+from src.notifier import send_email_smtp
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,18 @@ async def poll_and_alert() -> None:
                 "severity": parsed.get("severity", "unknown"),
             }
             await broadcast_alert(user.id, alert_payload)
+
+            # 5. Send email alert if user has an email registered
+            if user.email:
+                try:
+                    subject = (
+                        f"[RecallAlert] {parsed.get('severity', 'unknown').title()} Severity"
+                        f" — {recall_record.get('product_description', 'Food Recall')}"
+                    )
+                    send_email_smtp(subject=subject, body=alert_text, to_email=user.email)
+                except Exception:
+                    logger.exception("Failed to send email alert to %s", user.email)
+
             alert_count += 1
 
             logger.info(

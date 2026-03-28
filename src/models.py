@@ -22,6 +22,8 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     telegram_id: int = Field(unique=True, index=True)
     language: str = Field(default="en")  # en, es, vi, …
+    email: Optional[str] = Field(default=None, index=True)
+    notify_new_only: bool = Field(default=True)  # True = new recalls only, False = all pantry matches
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -83,6 +85,19 @@ def set_user_language(user_id: int, language: str) -> User:
         if not user:
             raise ValueError(f"User {user_id} not found")
         user.language = language
+        sess.add(user)
+        sess.commit()
+        sess.refresh(user)
+        return user
+
+
+def set_user_email(user_id: int, email: str, notify_new_only: bool = True) -> User:
+    with get_session() as sess:
+        user = sess.get(User, user_id)
+        if not user:
+            raise ValueError(f"User {user_id} not found")
+        user.email = email
+        user.notify_new_only = notify_new_only
         sess.add(user)
         sess.commit()
         sess.refresh(user)
