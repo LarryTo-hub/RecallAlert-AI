@@ -4,6 +4,7 @@ beautifulsoup4
 python-dotenv
 fastapi
 uvicorn[standard]
+python-multipart
 sqlmodel
 apscheduler
 twilio
