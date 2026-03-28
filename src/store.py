@@ -36,6 +36,15 @@ def _fallback_id(record: Dict[str, Any]) -> str:
     digest = hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()[:16]
     return f"fallback-{digest}"
 
+
+def _sanitize_doc_id(doc_id: str) -> str:
+    """Sanitize doc_id for Firestore (remove invalid characters)."""
+    # Firestore allows: alphanumeric, underscore, hyphen
+    import re
+    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', str(doc_id))
+    # Ensure it's not empty
+    return sanitized or "doc"
+
 def _init_firestore() -> None:
     """Initialize Firebase Admin + Firestore client once."""
     global _firestore_client
@@ -78,7 +87,7 @@ def _firestore_save_if_new(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     _init_firestore()
 
     recall_number = record.get("recall_number")
-    doc_id = str(recall_number or _fallback_id(record))
+    doc_id = _sanitize_doc_id(str(recall_number or _fallback_id(record)))
 
     doc_ref = _firestore_client.collection("recalls").document(doc_id)
     snap = doc_ref.get()
