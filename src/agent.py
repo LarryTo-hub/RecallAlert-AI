@@ -1,91 +1,215 @@
-# Agent module — LLM-based recall summarization using Google Gemini.
+"""Gemini-powered agent for recall parsing, pantry matching, OCR, and alerts."""
 
 from __future__ import annotations
 
 import json
 import logging
 import os
-import re
+from typing import Any, Dict, List
 
+from pathlib import Path
 from dotenv import load_dotenv
+import langchain
+import langgraph
 
-load_dotenv()
+# Ensure .env is loaded from the project root regardless of cwd
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(_env_path)
+
+from google import genai
 
 logger = logging.getLogger(__name__)
 
+# ── Gemini setup ──────────────────────────────────────────────────────────
 
-_SYSTEM_PROMPT = """\
-You are a food-safety analyst. Given raw text from a USDA or FDA recall notice,
-extract the key information and return ONLY a JSON object with these exact fields:
+_client: genai.Client | None = None
+_MODEL = "gemini-2.0-flash"
 
-{
-  "summary": "<2-3 sentence plain-English summary of the recall>",
-  "risk_level": "<Low | Medium | High>",
-  "action_steps": ["<step 1>", "<step 2>", ...],
-  "who_is_affected": "<description of the population at risk>",
-  "key_identifiers": ["<brand name>", "<lot number>", "<UPC>", ...]
-}
 
-Rules:
-- risk_level must be exactly one of: Low, Medium, High
-- action_steps must be a JSON array of short imperative sentences
-- key_identifiers must be a JSON array (may be empty if none found)
-- Return ONLY the JSON object — no markdown fences, no extra text
-"""
+def _get_client() -> genai.Client:
+    """Lazy-init the Gemini client so imports succeed without an API key."""
+    global _client
+    if _client is None:
+        api_key = os.getenv("GOOGLE_API_KEY", "")
+        if not api_key:
+            raise RuntimeError("GOOGLE_API_KEY is not set in .env")
+        _client = genai.Client(api_key=api_key)
+    return _client
 
-def summarize_recall(text: str) -> dict:
-    """Call Gemini to classify and summarize a recall notice.
 
-    Parameters:
-    text : str
-        Raw recall notice text (product description, reason, etc.)
+# ── Recall parsing ────────────────────────────────────────────────────────
 
-    Returns:
-    dict
-        Structured recall info. On error, returns a dict with an "error" key.
+def parse_recall(recall: Dict[str, Any]) -> Dict[str, Any]:
+    """Use Gemini to extract structured fields from a raw recall record.
+
+    Returns dict with: products, brands, severity, lot_codes, reason_summary
     """
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError(
-            "GEMINI_API_KEY is not set. Add it to your .env file. "
-            "Get a free key at https://aistudio.google.com/app/apikey"
+    prompt = (
+        "You are a food-safety analyst. Given the following recall record, "
+        "extract structured information. Return ONLY a valid JSON object with "
+        "these keys:\n"
+        '  "products": list of product name strings,\n'
+        '  "brands": list of brand name strings,\n'
+        '  "severity": "high" | "medium" | "low",\n'
+        '  "lot_codes": list of lot/batch code strings (empty list if none),\n'
+        '  "reason_summary": one-sentence plain-English summary of the recall reason\n\n'
+        f"Recall record:\n{json.dumps(recall, default=str, indent=2)}"
+    )
+
+    try:
+        resp = _get_client().models.generate_content(model=_MODEL, contents=prompt)
+        text = resp.text.strip()
+        # Strip markdown fences if present
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.endswith("```"):
+            text = text[: text.rfind("```")]
+        return json.loads(text)
+    except Exception:
+        logger.exception("Gemini parse_recall failed; returning fallback")
+        return {
+            "products": [recall.get("product_description", "")],
+            "brands": [b for b in [recall.get("brand_name")] if b],
+            "severity": "medium",
+            "lot_codes": [],
+            "reason_summary": recall.get("reason_for_recall", ""),
+        }
+
+
+# ── Pantry matching ───────────────────────────────────────────────────────
+
+def match_pantry(parsed_recall: Dict[str, Any],
+                 pantry_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Use Gemini to find which pantry items match a parsed recall.
+
+    pantry_items: list of dicts with keys product_name, brand, lot_code.
+    Returns list of matched pantry item dicts.
+    """
+    if not pantry_items:
+        return []
+
+    prompt = (
+        "You are a food-safety matching engine. Given a recall and a user's "
+        "pantry list, determine which pantry items are likely affected.\n\n"
+        "Return ONLY a valid JSON array of indices (0-based) of the pantry "
+        "items that match. If none match, return an empty array [].\n\n"
+        "Consider partial name matches, brand matches, and lot code matches. "
+        "Err on the side of caution — if a pantry item COULD be affected, "
+        "include it.\n\n"
+        f"Recall:\n{json.dumps(parsed_recall, default=str, indent=2)}\n\n"
+        f"Pantry items:\n{json.dumps(pantry_items, default=str, indent=2)}"
+    )
+
+    try:
+        resp = _get_client().models.generate_content(model=_MODEL, contents=prompt)
+        text = resp.text.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.endswith("```"):
+            text = text[: text.rfind("```")]
+        indices = json.loads(text)
+        return [pantry_items[i] for i in indices if 0 <= i < len(pantry_items)]
+    except Exception:
+        logger.exception("Gemini match_pantry failed; falling back to keyword match")
+        # Simple keyword fallback
+        recall_words = set()
+        for p in parsed_recall.get("products", []):
+            recall_words.update(w.lower() for w in p.split() if len(w) > 2)
+        for b in parsed_recall.get("brands", []):
+            recall_words.update(w.lower() for w in b.split() if len(w) > 2)
+
+        matched = []
+        for item in pantry_items:
+            item_words = set(w.lower() for w in item.get("product_name", "").split() if len(w) > 2)
+            if item.get("brand"):
+                item_words.update(w.lower() for w in item["brand"].split() if len(w) > 2)
+            if recall_words & item_words:
+                matched.append(item)
+        return matched
+
+
+# ── Multilingual alert generation ─────────────────────────────────────────
+
+def generate_alert(recall: Dict[str, Any],
+                   matched_items: List[Dict[str, Any]],
+                   language: str = "en") -> str:
+    """Generate a personalized multilingual alert message for a user."""
+    lang_names = {"en": "English", "es": "Spanish", "vi": "Vietnamese",
+                  "zh": "Chinese", "ko": "Korean", "fr": "French"}
+    lang_label = lang_names.get(language, language)
+
+    item_names = ", ".join(m.get("product_name", "?") for m in matched_items)
+
+    prompt = (
+        f"Write a concise food recall alert in {lang_label}. "
+        "Include:\n"
+        "1. What is being recalled and why (one sentence)\n"
+        "2. The user's affected pantry items\n"
+        "3. Disposal instructions (throw away or return to store)\n"
+        "4. A note that they may be eligible for a refund — contact the store\n\n"
+        f"Recall info:\n"
+        f"  Product: {recall.get('product_description', 'N/A')}\n"
+        f"  Brand: {recall.get('brand_name', 'N/A')}\n"
+        f"  Reason: {recall.get('reason_for_recall', 'N/A')}\n"
+        f"  Company: {recall.get('company_name', 'N/A')}\n"
+        f"  URL: {recall.get('url', '')}\n\n"
+        f"User's affected items: {item_names}\n\n"
+        "Keep the message under 300 words. Use a warning emoji at the start."
+    )
+
+    try:
+        resp = _get_client().models.generate_content(model=_MODEL, contents=prompt)
+        return resp.text.strip()
+    except Exception:
+        logger.exception("Gemini generate_alert failed; using fallback")
+        return (
+            f"⚠️ RECALL ALERT: {recall.get('product_description', 'Unknown product')} "
+            f"has been recalled. Reason: {recall.get('reason_for_recall', 'N/A')}. "
+            f"Your affected items: {item_names}. "
+            "Please dispose of these items or return them to the store for a refund."
         )
 
-    model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
-    try:
-        from google import genai
-        from google.genai import types
-    except ImportError as exc:
-        raise RuntimeError(
-            "google-genai is not installed. Run: pip install google-genai"
-        ) from exc
+# ── Receipt OCR ───────────────────────────────────────────────────────────
 
-    client = genai.Client(api_key=api_key)
+def ocr_receipt(image_bytes: bytes) -> List[Dict[str, str]]:
+    """Use Gemini Vision to extract product names and lot codes from a receipt photo.
 
-    prompt = f"Recall notice:\n\n{text.strip()}"
-    logger.info("Calling Gemini model=%s ...", model_name)
-
-    response = client.models.generate_content(
-        model=model_name,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=_SYSTEM_PROMPT,
-        ),
+    Returns list of dicts: {"product_name": ..., "brand": ..., "lot_code": ...}
+    """
+    prompt = (
+        "You are an OCR assistant that reads grocery receipts. "
+        "Extract every food/grocery product from this receipt image. "
+        "Return ONLY a valid JSON array of objects, each with:\n"
+        '  "product_name": the item name,\n'
+        '  "brand": brand if visible (null otherwise),\n'
+        '  "lot_code": lot or batch code if visible (null otherwise)\n\n'
+        "If you cannot read the receipt, return an empty array []."
     )
-    raw = response.text.strip()
-
-    raw = re.sub(r"^```(?:json)?\s*", "", raw)
-    raw = re.sub(r"\s*```$", "", raw)
 
     try:
-        result = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        logger.error("Gemini returned non-JSON output: %s", raw)
-        raise ValueError(f"Could not parse Gemini response as JSON: {exc}\n\nRaw output:\n{raw}") from exc
+        from google.genai import types
 
-    if "risk_level" in result:
-        result["risk_level"] = result["risk_level"].capitalize()
-
-    logger.info("Gemini summarized recall: risk_level=%s", result.get("risk_level"))
-    return result
+        image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
+        resp = _get_client().models.generate_content(model=_MODEL, contents=[prompt, image_part])
+        text = resp.text.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.endswith("```"):
+            text = text[: text.rfind("```")]
+        items = json.loads(text)
+        # Ensure it's a list of dicts
+        if isinstance(items, list):
+            return [
+                {
+                    "product_name": it.get("product_name", "Unknown"),
+                    "brand": it.get("brand"),
+                    "lot_code": it.get("lot_code"),
+                }
+                for it in items
+                if isinstance(it, dict)
+            ]
+        return []
+    except Exception:
+        logger.exception("Gemini OCR failed")
+        return []

@@ -1,104 +1,180 @@
 # Team Tutorial — Recall AI
 
-This document is a short, hands-on tutorial to onboard contributors to the Recall AI project. It shows the repo layout, local setup, a safe demo run, and suggested small tasks to assign.
+This document is a short, hands-on tutorial to onboard contributors to the Recall AI project. It shows the repo layout, local setup, how to test the agent, and suggested tasks to assign.
 
 Duration: 10–15 minutes (live) or follow as self-guided.
 
-Prerequisites
+## Prerequisites
 - Windows with PowerShell
 - Python 3.11+ installed and on PATH
 - Git installed and configured (name/email)
-- (Optional) A Twilio account and phone number for SMS tests
+- A Google Gemini API key (free: https://aistudio.google.com/app/apikey)
+- A Telegram bot token (free: message @BotFather on Telegram → `/newbot`)
 
-Quick repo overview
-- `README.md` — quickstart and team notes
-- `TUTORIAL.md` — this file
-- `.env.example` — template for required environment variables (do NOT commit `.env` with secrets)
+## Architecture Overview
+
+```
+FDA/USDA Sources ──► fetcher.py ──► store.py (SQLite)
+                                        │
+                        polling.py (every 60 min)
+                                        │
+                                   agent.py (Gemini)
+                                  ┌─────┴─────┐
+                            parse_recall   match_pantry
+                                  │            │
+                            generate_alert (multilingual)
+                                  │
+                              bot.py (Telegram)
+                                  │
+                            User gets alert
+                         [Disposed] [Ignored]
+```
+
+## Repo Layout
+- `run.py` — **entry point** — starts the Telegram bot + background polling loop
+- `.env.example` — template for required environment variables
 - `requirements.txt` — Python dependencies
-- `src/` — primary Python package
-  - `fetcher.py` — fetches recalls (FDA) and stubs for additional sources
-  - `store.py` — SQLModel/SQLite persistence and simple dedupe
-  - `notifier.py` — Twilio/email notifier helpers (dry-run support)
-  - `agent.py` — LLM agent placeholder (future)
-  - `main.py` — run-once runner for smoke tests
-- `scripts/` — convenience scripts (demo, team tutorial)
-- `demo/` — demo output (created by `scripts/demo_fetch.py`)
+- `src/`
+  - `agent.py` — Gemini-powered recall parsing, pantry matching, multilingual alerts, receipt OCR
+  - `bot.py` — Telegram bot interface (/start, /add, /pantry, receipt photos, feedback buttons)
+  - `polling.py` — Background polling loop (APScheduler) — fetches recalls, matches pantries, sends alerts
+  - `models.py` — Database models: User, PantryItem, Alert (SQLModel/SQLite)
+  - `fetcher.py` — Multi-source recall fetchers (FDA webpage + enforcement API, USDA webpage + mirror + RSS)
+  - `store.py` — Recall persistence with deduplication (SQLite + optional Firestore)
+  - `notifier.py` — SMS/email notification helpers (Twilio, SMTP gateway)
+  - `main.py` — Legacy simple runner (fetch + store, no bot)
+- `scripts/` — convenience scripts
+  - `demo_fetch.py` — fetch and print latest recalls without running the bot
+- `demo/` — demo output files
 
-Quick setup (one-time per machine)
+## Quick Setup (one-time per machine)
+
 1. Open PowerShell and go to the project root:
 ```powershell
 Set-Location "C:\Users\larry\OneDrive\Desktop\Recall AI\recall-agent"
 ```
+
 2. Create and activate virtualenv:
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
-3. Upgrade pip and install dependencies (optional; you can skip if already installed):
+
+3. Install dependencies:
 ```powershell
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
-4. Copy `.env.example` to `.env` and fill in any test credentials you will use locally (do NOT commit `.env`):
+
+4. Copy `.env.example` to `.env` and add your keys:
 ```powershell
 cp .env.example .env
-# edit .env with your values (TWILIO, SMTP, TEST_TO, etc.)
+# Edit .env and fill in:
+#   GOOGLE_API_KEY=your-gemini-key
+#   TELEGRAM_BOT_TOKEN=your-bot-token
 ```
 
-Run the demo (safe/dry-run)
-1. Run the demo fetch script which saves to `demo/recalls_demo.json` and prints a short summary:
+## Testing the Agent
+
+### Test 1: Fetch recalls (no API keys needed)
 ```powershell
-.\.venv\Scripts\Activate.ps1
-python .\scripts\demo_fetch.py 5
+python scripts/demo_fetch.py
 ```
-2. Open `demo/recalls_demo.json` in VS Code to inspect fetched records.
-3. Optionally run the smoke runner (persists to `recalls.db`):
+Fetches 5 FDA + 5 USDA recalls, saves to `demo/recalls_demo.json`, prints a summary.
+
+### Test 2: Test Gemini parsing (needs GOOGLE_API_KEY)
 ```powershell
-python -m src.main
+python -c "
+from src.agent import parse_recall
+from src.fetcher import fetch_fda_recalls
+recalls = fetch_fda_recalls(1)
+if recalls:
+    parsed = parse_recall(recalls[0])
+    import json
+    print(json.dumps(parsed, indent=2))
+"
 ```
+Should output structured JSON with products, brands, severity, lot_codes, and reason_summary.
 
-Team walkthrough script (run during meeting)
-- Run `scripts/team_tutorial.ps1` from PowerShell. It will perform checks, run the demo, and print guidance. Example:
+### Test 3: Test Telegram bot connection (needs TELEGRAM_BOT_TOKEN)
 ```powershell
-.\scripts\team_tutorial.ps1 -DemoLimit 5
+python -c "
+import os, requests
+from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv(Path('src/agent.py').resolve().parent.parent / '.env')
+token = os.getenv('TELEGRAM_BOT_TOKEN')
+resp = requests.get('https://api.telegram.org/bot' + token + '/getMe', timeout=10)
+print(resp.json())
+"
 ```
+Should show `{'ok': True, 'result': {'username': 'your_bot_name', ...}}`.
 
-What to show during the demo
-- Terminal output from `demo_fetch.py` showing recall numbers and short descriptions
-- `demo/recalls_demo.json` open in editor (prettified)
-- `src/notifier.py` showing dry-run mode (explain Twilio integration and safety)
-- `recalls.db` presence and a quick note about moving to Postgres in production
+### Test 4: Run the full system
+```powershell
+python run.py
+```
+This starts:
+- The background polling loop (fetches recalls every 60 minutes, runs once immediately)
+- The Telegram bot (listens for user commands)
 
-Short talking points (verbatim snippets)
-- Elevator pitch: "Recall AI detects food recalls from public sources, stores them, deduplicates, and notifies customers via SMS/email/webhook."
-- Architecture: "Sources → fetcher → store → agent (LLM) → notifier. Scheduler triggers fetches; FastAPI will expose health/trigger endpoints." 
-- Safety: "We default notifier to dry-run for demos and require local `.env` for real creds. Never commit secrets."
+Then open Telegram and message your bot:
+1. `/start` — register and pick a language (en, es, vi, zh, ko, fr)
+2. `/add Chicken nuggets` — manually add a pantry item
+3. Send a **receipt photo** — Gemini Vision OCR extracts products
+4. `/pantry` — view your items
+5. `/clear` — clear pantry
+6. `/help` — list all commands
 
-Suggested tasks to assign (small & actionable)
-- Fetcher: add USDA/RSS feed sources and unit tests (`src/fetcher.py`)
-- Store: expand model, add notifications table and uniqueness constraints, add tests (`src/store.py`)
-- Notifier: implement Twilio wrapper, email fallback, unsubscribe handling, and retries (`src/notifier.py`)
-- API/Scheduler: create `src/app.py` with FastAPI endpoints and an APScheduler job to call `src.main.run_once()` on a schedule
-- QA/CI: add `pytest` tests and a GitHub Actions workflow to run tests on PRs
+When the polling loop finds a recall matching your pantry, you'll receive an alert with **Disposed / Ignored** feedback buttons.
 
-Git workflow guidelines
+## Key Components Explained
+
+### agent.py (Gemini Agent)
+- `parse_recall(recall)` — extracts products, brands, severity, lot codes from a raw recall
+- `match_pantry(parsed_recall, pantry_items)` — finds which pantry items are affected
+- `generate_alert(recall, matched_items, language)` — writes a multilingual alert message
+- `ocr_receipt(image_bytes)` — extracts product names from a receipt photo
+
+### bot.py (Telegram Bot)
+- `/start` — language selection with inline keyboard
+- `/add <product>` — manual pantry entry
+- Photo handler — downloads image, runs OCR, stores extracted items
+- Feedback callback — records "disposed" or "ignored" responses
+
+### polling.py (Background Loop)
+- Runs on APScheduler (configurable interval via `FETCH_INTERVAL_MINUTES`)
+- Fetches FDA + USDA recalls → stores new ones → parses with Gemini → matches all users' pantries → sends Telegram alerts
+
+### models.py (Database)
+- `User` — telegram_id, language preference
+- `PantryItem` — product_name, brand, lot_code, source (manual/receipt)
+- `Alert` — links user to recall, stores message text and feedback status
+
+## Suggested Tasks to Assign
+
+- **Web interface**: Build a FastAPI frontend using the same `agent.py` functions
+- **More languages**: Add language options to `SUPPORTED_LANGUAGES` in `bot.py`
+- **Testing**: Add pytest tests for `parse_recall`, `match_pantry`, and `ocr_receipt`
+- **Deployment**: Dockerize and deploy to a cloud provider
+- **Notifications**: Extend to SMS (Twilio) and email alongside Telegram
+- **CI/CD**: Add GitHub Actions workflow to run tests on PRs
+
+## Git Workflow
 - Use `main` as the default branch
 - Create feature branches: `git checkout -b feature/<name>`
 - Push and open a PR; request at least one reviewer
-- Checklist for PRs: includes tests or test plan, no secrets, logging, and DB changes considered
+- Checklist for PRs: includes tests, no secrets, logging, DB changes considered
 
-Security and compliance
-- `.env.example` is safe to commit; never commit real secrets.
-- For production use a secrets store (GitHub Secrets / Azure Key Vault).
-- For SMS: confirm recipients opt-in and include unsubscribe instructions.
+## Security and Compliance
+- `.env.example` is safe to commit; never commit real secrets
+- `.env` is in `.gitignore`
+- For production use a secrets manager (GitHub Secrets / Azure Key Vault)
+- For SMS: confirm recipients opt-in and include unsubscribe instructions
 
-Appendix: troubleshooting
-- If `ModuleNotFoundError: No module named 'src'` occurs when running scripts, ensure you run from project root and activate `.venv`.
-- If Git push is rejected because of divergent history, fetch and merge or open a new branch and PR.
-
-Contact / next steps
-- After the demo, create GitHub issues for the suggested tasks and assign owners.
-- If you want, I can create those issues and assign placeholders.
-
----
-This tutorial file was created to standardize onboarding for the team. Use it during your walkthrough and share follow-up tasks in the repo issues.
+## Troubleshooting
+- **`ModuleNotFoundError: No module named 'src'`** — run from project root with `.venv` activated
+- **`GOOGLE_API_KEY is not set`** — make sure `.env` is saved (Ctrl+S) with your key
+- **`TELEGRAM_BOT_TOKEN` errors** — get a token from @BotFather on Telegram (`/newbot`)
+- **USDA returns empty results** — this is expected; the Jina mirror fallback handles it automatically
+- **Git push rejected** — fetch and merge, or create a new branch and PR

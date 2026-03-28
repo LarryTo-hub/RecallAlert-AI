@@ -7,4 +7,12 @@ uvicorn[standard]
 sqlmodel
 apscheduler
 twilio
+firebase-admin
 google-genai
+python-telegram-bot
+Pillow
+langchain
+langgraph
+pytest
+pytest-asyncio
+pytest-mock
