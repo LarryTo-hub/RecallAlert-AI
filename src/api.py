@@ -91,7 +91,7 @@ class RecallResponse(BaseModel):
 
 
 class AlertFeedback(BaseModel):
-    status: str = Field(..., regex="^(disposed|ignored)$")
+    status: str = Field(..., pattern="^(disposed|ignored)$")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
