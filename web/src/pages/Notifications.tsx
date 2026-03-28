@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  testTelegram, saveNotificationSettings, setTelegramId, getTelegramId,
+  saveNotificationSettings, getTelegramId,
+  saveEmailSettings, getEmailSettings,
 } from "@/api/client";
 
 const LANGUAGES = [
@@ -26,7 +27,8 @@ const SOURCES = [
 ];
 
 export default function Notifications() {
-  const [chatId, setChatId] = useState(getTelegramId() || "");
+  const [email, setEmail] = useState("");
+  const [notifyNewOnly, setNotifyNewOnly] = useState(true);
   const [language, setLanguage] = useState(
     () => localStorage.getItem("language") ?? "en"
   );
@@ -43,28 +45,30 @@ export default function Notifications() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const testMutation = useMutation({
-    mutationFn: () => testTelegram(Number(chatId), language),
-    onSuccess: () => {
-      setTelegramId(Number(chatId));
-      showToast("Test message sent! Check your Telegram.");
+  useQuery({
+    queryKey: ["emailSettings"],
+    queryFn: getEmailSettings,
+    onSuccess: (data: { email: string; notify_new_only: boolean }) => {
+      if (data.email) setEmail(data.email);
+      setNotifyNewOnly(data.notify_new_only);
     },
-    onError: (e: Error) => showToast(`Failed: ${e.message}`, false),
-  });
+  } as any);
 
   const saveMutation = useMutation({
     mutationFn: () =>
-      saveNotificationSettings({
-        telegram_id: Number(chatId) || getTelegramId(),
-        language,
-        severity_threshold: threshold,
-        sources,
-      }),
+      Promise.all([
+        saveEmailSettings({ email, notify_new_only: notifyNewOnly }),
+        saveNotificationSettings({
+          telegram_id: getTelegramId(),
+          language,
+          severity_threshold: threshold,
+          sources,
+        }),
+      ]),
     onSuccess: () => {
       localStorage.setItem("language", language);
       localStorage.setItem("severity_threshold", threshold);
       localStorage.setItem("sources", sources);
-      if (chatId) setTelegramId(Number(chatId));
       showToast("Settings saved");
     },
     onError: (e: Error) => showToast(`Failed: ${e.message}`, false),
@@ -81,46 +85,61 @@ export default function Notifications() {
 
       <h1 className="text-xl font-bold text-gray-900 mb-5">Notifications</h1>
 
-      {/* Telegram setup */}
+      {/* Email setup */}
       <section className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
         <h2 className="font-semibold text-gray-800 mb-1 flex items-center gap-2">
-          <span aria-hidden="true">✈️</span> Telegram Alerts
+          <span aria-hidden="true">📧</span> Email Alerts
         </h2>
         <p className="text-xs text-gray-500 mb-3">
-          Connect your Telegram account to receive instant recall alerts.{" "}
-          <a
-            href="https://t.me/RecallAlertBot"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary font-medium hover:underline"
-          >
-            Open @RecallAlertBot →
-          </a>
+          Enter your email to receive food recall alerts when items in your pantry are affected.
         </p>
 
-        <label className="block text-xs text-gray-600 mb-1" htmlFor="chat-id">
-          Your Telegram Chat ID
+        <label className="block text-xs text-gray-600 mb-1" htmlFor="email">
+          Your Email Address
         </label>
-        <div className="flex gap-2">
-          <input
-            id="chat-id"
-            type="number"
-            placeholder="e.g. 123456789"
-            value={chatId}
-            onChange={(e) => setChatId(e.target.value)}
-            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-          <button
-            onClick={() => testMutation.mutate()}
-            disabled={!chatId || testMutation.isPending}
-            className="bg-primary text-white text-sm font-medium px-4 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-60"
-          >
-            {testMutation.isPending ? "…" : "Test"}
-          </button>
+        <input
+          id="email"
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </section>
+
+      {/* Email preference */}
+      <section className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+        <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <span aria-hidden="true">🔔</span> Email Preferences
+        </h2>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input
+              type="radio"
+              name="notify_pref"
+              checked={notifyNewOnly}
+              onChange={() => setNotifyNewOnly(true)}
+              className="accent-primary"
+            />
+            <div>
+              <span className="text-sm text-gray-700 font-medium">New recalls only</span>
+              <p className="text-xs text-gray-400">Only email me when a brand new recall matches my pantry.</p>
+            </div>
+          </label>
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input
+              type="radio"
+              name="notify_pref"
+              checked={!notifyNewOnly}
+              onChange={() => setNotifyNewOnly(false)}
+              className="accent-primary"
+            />
+            <div>
+              <span className="text-sm text-gray-700 font-medium">All pantry matches</span>
+              <p className="text-xs text-gray-400">Email me for any recall, including existing ones, that matches my pantry.</p>
+            </div>
+          </label>
         </div>
-        <p className="text-xs text-gray-400 mt-1.5">
-          To get your Chat ID: message @userinfobot on Telegram.
-        </p>
       </section>
 
       {/* Language */}

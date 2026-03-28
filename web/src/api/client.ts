@@ -191,6 +191,20 @@ export async function saveNotificationSettings(body: {
   });
 }
 
+export async function saveEmailSettings(body: {
+  email: string;
+  notify_new_only: boolean;
+}): Promise<unknown> {
+  return request(`/api/notifications/email?telegram_id=${getTelegramId()}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getEmailSettings(): Promise<{ email: string; notify_new_only: boolean }> {
+  return request(`/api/notifications/email?telegram_id=${getTelegramId()}`);
+}
+
 // ── Stats ──────────────────────────────────────────────────────────────────
 
 export async function fetchStats(): Promise<Stats> {

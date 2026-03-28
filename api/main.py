@@ -29,6 +29,7 @@ from sqlmodel import Session, select
 
 from src import agent, fetcher
 from src import store as recall_store
+from src.notifier import send_email_smtp
 from src.models import (
     Alert,
     PantryItem,
@@ -42,6 +43,7 @@ from src.models import (
     get_session,
     init_models_db,
     set_user_language,
+    set_user_email,
     update_alert_feedback,
 )
 
@@ -157,6 +159,11 @@ class NotificationSettings(BaseModel):
     language: str = "en"
     severity_threshold: str = "all"  # all | medium+ | high
     sources: str = "both"  # fda | usda | both
+
+
+class EmailSettings(BaseModel):
+    email: str
+    notify_new_only: bool = True  # True = new recalls only, False = all pantry matches
 
 
 # ── Recalls endpoints ─────────────────────────────────────────────────────
@@ -296,6 +303,22 @@ async def match_pantry(telegram_id: int = Query(DEMO_USER_ID)) -> Dict[str, Any]
                 "matched_items": matched,
             })
 
+    # Send email if user has one registered and there are matches
+    if matches and user.email:
+        try:
+            matched_products = ", ".join(
+                m["product_name"] for match in matches for m in match["matched_items"]
+            )
+            subject = f"[RecallAlert] {len(matches)} recall(s) matched your pantry"
+            body = f"The following pantry items matched active recalls:\n\n{matched_products}\n\n"
+            for m in matches:
+                recall = m["recall"]
+                body += f"• {recall.get('product_description', 'Unknown')} — {recall.get('reason_for_recall', 'N/A')}\n"
+            body += "\nCheck the RecallAlert app for full details."
+            await asyncio.to_thread(send_email_smtp, subject, body, user.email)
+        except Exception:
+            logger.exception("Failed to send match email to %s", user.email)
+
     return {"matches": matches}
 
 
@@ -363,13 +386,36 @@ async def test_telegram(body: TelegramTestRequest) -> Dict[str, Any]:
 @app.post("/api/notifications/settings")
 async def save_notification_settings(body: NotificationSettings) -> Dict[str, Any]:
     user = get_or_create_user(body.telegram_id)
-    set_user_language(body.telegram_id, body.language)
+    set_user_language(user.id, body.language)
     return {
         "status": "saved",
         "telegram_id": body.telegram_id,
         "language": body.language,
         "severity_threshold": body.severity_threshold,
         "sources": body.sources,
+    }
+
+
+@app.post("/api/notifications/email")
+async def save_email_settings(
+    body: EmailSettings,
+    telegram_id: int = Query(DEMO_USER_ID),
+) -> Dict[str, Any]:
+    user = _resolve_user(telegram_id)
+    set_user_email(user.id, body.email, body.notify_new_only)
+    return {
+        "status": "saved",
+        "email": body.email,
+        "notify_new_only": body.notify_new_only,
+    }
+
+
+@app.get("/api/notifications/email")
+async def get_email_settings(telegram_id: int = Query(DEMO_USER_ID)) -> Dict[str, Any]:
+    user = _resolve_user(telegram_id)
+    return {
+        "email": user.email or "",
+        "notify_new_only": user.notify_new_only,
     }
 
 
