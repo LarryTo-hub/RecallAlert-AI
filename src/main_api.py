@@ -101,8 +101,11 @@ app.router.lifespan_context = lifespan
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "web" / "dist"
 
-logger.info(f"Looking for frontend at: {FRONTEND_DIR}")
-logger.info(f"Frontend dir exists: {FRONTEND_DIR.exists()}")
+logger.info("BASE_DIR = %s", BASE_DIR)
+logger.info("src dir exists? %s", (BASE_DIR / "src").exists())
+logger.info("web dir exists? %s", (BASE_DIR / "web").exists())
+logger.info("web/dist exists? %s", (BASE_DIR / "web" / "dist").exists())
+logger.info("web/dist/index.html exists? %s", (BASE_DIR / "web" / "dist" / "index.html").exists())
 
 if FRONTEND_DIR.exists():
     logger.info(f"✅ Mounting React frontend from {FRONTEND_DIR}")

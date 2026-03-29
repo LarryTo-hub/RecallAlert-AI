@@ -3,7 +3,7 @@ services:
   - type: web
     name: recallalert-api
     runtime: python
-    buildCommand: cd web && npm install && npm run build && cd .. && pip install -r requirements.txt
+    buildCommand: cd web && npm install && npm run build && ls -la dist && test -f dist/index.html && cd .. && pip install -r requirements.txt
     startCommand: python -m uvicorn src.main_api:app --host 0.0.0.0 --port $PORT
     plan: starter
     envVars:

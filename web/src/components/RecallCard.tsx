@@ -13,7 +13,7 @@ const statusColors: Record<string, string> = {
   TERMINATED: "text-green-600",
 };
 
-export default function RecallCard({ recall, severity, index }: Props) {
+export default function RecallCard({ recall, severity }: Props) {
   const statusCls = statusColors[(recall.status ?? "").toUpperCase()] ?? "text-gray-500";
   const sourceLabel = recall.source?.startsWith("FDA") ? "FDA" : "USDA";
   const sourceCls = sourceLabel === "FDA"
