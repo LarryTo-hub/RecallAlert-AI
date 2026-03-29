@@ -130,6 +130,14 @@ class Recall(SQLModel, table=True):
     reason_for_recall: Optional[str] = None
     product_description: Optional[str] = None
     recall_initiation_date: Optional[str] = None
+    source: Optional[str] = None
+    brand_name: Optional[str] = None
+    product_type: Optional[str] = None
+    company_name: Optional[str] = None
+    status: Optional[str] = None
+    affected_area: Optional[str] = None
+    report_date: Optional[str] = None
+    url: Optional[str] = None
 
 def _sqlite_init_db() -> None:
     SQLModel.metadata.create_all(_engine)
@@ -190,31 +198,79 @@ def cleanup() -> None:
     # SQLite engine doesn't require explicit cleanup
 
 
-def get_all_recalls(skip: int = 0, limit: int = 20) -> list:
+def get_all_recalls(
+    skip: int = 0,
+    limit: int = 20,
+    source: Optional[str] = None,
+    status: Optional[str] = None,
+    q: Optional[str] = None,
+) -> list:
     """Get paginated list of recalls from storage."""
     if STORE_BACKEND == "firebase":
-        # For Firestore, query the recalls collection
-        docs = _firestore_client.collection("recalls").limit(limit).offset(skip).stream()
-        return [doc.to_dict() for doc in docs]
+        query = _firestore_client.collection("recalls")
+        if source:
+            query = query.where("source", "==", source)
+        if status:
+            query = query.where("status", "==", status)
+        docs = query.limit(limit).offset(skip).stream()
+        results = [doc.to_dict() for doc in docs]
+        if q:
+            q_lower = q.lower()
+            results = [
+                r for r in results
+                if q_lower in (r.get("product_description") or "").lower()
+                or q_lower in (r.get("brand_name") or "").lower()
+                or q_lower in (r.get("reason_for_recall") or "").lower()
+            ]
+        return results
     else:
         # For SQLite
         with Session(_engine) as sess:
-            recalls = sess.exec(
-                select(Recall).order_by(Recall.id.desc()).offset(skip).limit(limit)
-            ).all()
+            query = select(Recall).order_by(Recall.id.desc())
+            if source:
+                query = query.where(Recall.source == source)
+            if status:
+                query = query.where(Recall.status == status)
+            if q:
+                q_like = f"%{q}%"
+                from sqlmodel import or_
+                query = query.where(
+                    or_(
+                        Recall.product_description.contains(q),
+                        Recall.brand_name.contains(q),
+                        Recall.reason_for_recall.contains(q),
+                    )
+                )
+            recalls = sess.exec(query.offset(skip).limit(limit)).all()
             return [r.model_dump() for r in recalls]
 
 
-def get_recall_count() -> int:
+def get_recall_count(
+    source: Optional[str] = None,
+    status: Optional[str] = None,
+    q: Optional[str] = None,
+) -> int:
     """Get total number of recalls in storage."""
     if STORE_BACKEND == "firebase":
-        # For Firestore, get count
-        return len(list(_firestore_client.collection("recalls").stream()))
+        return len(get_all_recalls(skip=0, limit=10000, source=source, status=status, q=q))
     else:
-        # For SQLite
         from sqlmodel import func
         with Session(_engine) as sess:
-            count = sess.exec(select(func.count(Recall.id))).first()
+            query = select(func.count(Recall.id))
+            if source:
+                query = query.where(Recall.source == source)
+            if status:
+                query = query.where(Recall.status == status)
+            if q:
+                from sqlmodel import or_
+                query = query.where(
+                    or_(
+                        Recall.product_description.contains(q),
+                        Recall.brand_name.contains(q),
+                        Recall.reason_for_recall.contains(q),
+                    )
+                )
+            count = sess.exec(query).first()
             return count or 0
 
 

@@ -2,14 +2,16 @@
 
 const BASE =
   import.meta.env.VITE_API_URL ??
-  (window.location.hostname === "localhost" ? "http://localhost:8000" : "");
+  (window.location.hostname === "localhost" ? "http://localhost:8080" : "");
 
-export function getTelegramId(): number {
-  return Number(localStorage.getItem("telegram_id") ?? "0");
-}
-
-export function setTelegramId(id: number): void {
-  localStorage.setItem("telegram_id", String(id));
+/** Returns a persistent anonymous user ID (UUID) stored in localStorage. */
+export function getUserId(): string {
+  let id = localStorage.getItem("user_id");
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("user_id", id);
+  }
+  return id;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -109,7 +111,7 @@ export async function triggerFetch(): Promise<{ count: number }> {
 // ── Pantry ─────────────────────────────────────────────────────────────────
 
 export async function fetchPantry(): Promise<{ items: PantryItem[] }> {
-  return request(`/pantry?telegram_id=${getTelegramId()}`);
+  return request(`/pantry?user_id=${getUserId()}`);
 }
 
 export async function addPantryItem(body: {
@@ -117,22 +119,22 @@ export async function addPantryItem(body: {
   brand?: string;
   lot_code?: string;
 }): Promise<PantryItem> {
-  return request(`/pantry?telegram_id=${getTelegramId()}`, {
+  return request(`/pantry/items?user_id=${getUserId()}`, {
     method: "POST",
     body: JSON.stringify(body),
   });
 }
 
 export async function deletePantryItem(id: number): Promise<void> {
-  return request(`/pantry/${id}?telegram_id=${getTelegramId()}`, { method: "DELETE" });
+  return request(`/pantry/items/${id}?user_id=${getUserId()}`, { method: "DELETE" });
 }
 
 export async function clearPantry(): Promise<{ deleted: number }> {
-  return request(`/pantry?telegram_id=${getTelegramId()}`, { method: "DELETE" });
+  return request(`/pantry?user_id=${getUserId()}`, { method: "DELETE" });
 }
 
 export function pantryExportUrl(): string {
-  return `${BASE}/pantry/export?telegram_id=${getTelegramId()}`;
+  return `${BASE}/pantry/export?user_id=${getUserId()}`;
 }
 
 // ── OCR ────────────────────────────────────────────────────────────────────
@@ -151,13 +153,13 @@ export async function ocrReceipt(file: File): Promise<{ items: OcrItem[] }> {
 // ── Match ──────────────────────────────────────────────────────────────────
 
 export async function matchPantry(): Promise<{ matches: MatchResult[] }> {
-  return request(`/match?telegram_id=${getTelegramId()}`, { method: "POST" });
+  return request(`/match?user_id=${getUserId()}`, { method: "POST" });
 }
 
 // ── Alerts ─────────────────────────────────────────────────────────────────
 
 export async function fetchAlerts(status?: string): Promise<{ alerts: AlertRecord[] }> {
-  const sp = new URLSearchParams({ telegram_id: String(getTelegramId()) });
+  const sp = new URLSearchParams({ user_id: getUserId() });
   if (status) sp.set("status", status);
   return request(`/alerts?${sp}`);
 }
@@ -166,28 +168,20 @@ export async function updateAlertFeedback(
   id: number,
   status: "disposed" | "ignored"
 ): Promise<AlertRecord> {
-  return request(`/alerts/${id}/feedback?telegram_id=${getTelegramId()}`, {
+  return request(`/alerts/${id}/feedback?user_id=${getUserId()}`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
   });
 }
 
-// ── Telegram ───────────────────────────────────────────────────────────────
-
-export async function testTelegram(chat_id: number, language: string): Promise<{ status: string }> {
-  return request("/telegram/test", {
-    method: "POST",
-    body: JSON.stringify({ chat_id, language }),
-  });
-}
+// ── Notifications ─────────────────────────────────────────────────────────
 
 export async function saveNotificationSettings(body: {
-  telegram_id: number;
   language: string;
   severity_threshold: string;
   sources: string;
 }): Promise<unknown> {
-  return request("/notifications/settings", {
+  return request(`/notifications/settings?user_id=${getUserId()}`, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -197,20 +191,20 @@ export async function saveEmailSettings(body: {
   email: string;
   notify_new_only: boolean;
 }): Promise<unknown> {
-  return request(`/notifications/email?telegram_id=${getTelegramId()}`, {
+  return request(`/notifications/email?user_id=${getUserId()}`, {
     method: "POST",
     body: JSON.stringify(body),
   });
 }
 
 export async function getEmailSettings(): Promise<{ email: string; notify_new_only: boolean }> {
-  return request(`/notifications/email?telegram_id=${getTelegramId()}`);
+  return request(`/notifications/email?user_id=${getUserId()}`);
 }
 
 // ── Stats ──────────────────────────────────────────────────────────────────
 
 export async function fetchStats(): Promise<Stats> {
-  return request(`/stats?telegram_id=${getTelegramId()}`);
+  return request(`/stats?user_id=${getUserId()}`);
 }
 
 // ── Chat (AI) ──────────────────────────────────────────────────────────────
@@ -218,6 +212,6 @@ export async function fetchStats(): Promise<Stats> {
 export async function sendChatMessage(message: string): Promise<{ reply: string }> {
   return request("/chat", {
     method: "POST",
-    body: JSON.stringify({ message, telegram_id: getTelegramId() }),
+    body: JSON.stringify({ message, user_id: getUserId() }),
   });
 }

@@ -83,11 +83,15 @@ class PantryItemResponse(BaseModel):
     added_at: str
 
 
+class PantryListResponse(BaseModel):
+    items: List[PantryItemResponse]
+
+
 class RecallResponse(BaseModel):
-    recall_number: str
-    product_description: str
-    reason_for_recall: Optional[str]
-    recall_initiation_date: Optional[str]
+    recall_number: Optional[str] = None
+    product_description: Optional[str] = None
+    reason_for_recall: Optional[str] = None
+    recall_initiation_date: Optional[str] = None
     severity: Optional[str] = None
     brands: List[str] = []
     lots: List[str] = []
@@ -115,6 +119,10 @@ class EmailSettings(BaseModel):
 class EmailSettingsUpdate(BaseModel):
     email: str
     notify_new_only: bool
+
+
+class AlertsResponse(BaseModel):
+    alerts: List[dict]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -253,32 +261,34 @@ async def set_language(language: str, token_payload: dict = Depends(verify_token
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-@app.get("/pantry", response_model=List[PantryItemResponse])
-async def get_pantry(token_payload: dict = Depends(verify_token)):
+@app.get("/pantry", response_model=PantryListResponse)
+async def get_pantry_endpoint(user_id: str = Query("")):
     """Get user's pantry items."""
-    from src.models import get_pantry
+    from src.models import get_or_create_user_by_key, get_pantry
 
-    user_id = token_payload["user_id"]
-    items = get_pantry(user_id)
-    return [
-        {
-            "id": item.id,
-            "product_name": item.product_name,
-            "brand": item.brand,
-            "lot_code": item.lot_code,
-            "added_at": item.added_at,
-        }
-        for item in items
-    ]
+    user = get_or_create_user_by_key(user_id)
+    items = get_pantry(user.id)
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "product_name": item.product_name,
+                "brand": item.brand,
+                "lot_code": item.lot_code,
+                "added_at": item.added_at,
+            }
+            for item in items
+        ]
+    }
 
 
 @app.post("/pantry/items", response_model=PantryItemResponse)
-async def add_pantry_item(item: PantryItemRequest, token_payload: dict = Depends(verify_token)):
+async def add_pantry_item_endpoint(item: PantryItemRequest, user_id: str = Query("")):
     """Add item to user's pantry."""
-    from src.models import add_pantry_item
+    from src.models import get_or_create_user_by_key, add_pantry_item
 
-    user_id = token_payload["user_id"]
-    added = add_pantry_item(user_id, item.product_name, item.brand, item.lot_code)
+    user = get_or_create_user_by_key(user_id)
+    added = add_pantry_item(user.id, item.product_name, item.brand, item.lot_code)
     return {
         "id": added.id,
         "product_name": added.product_name,
@@ -289,23 +299,23 @@ async def add_pantry_item(item: PantryItemRequest, token_payload: dict = Depends
 
 
 @app.delete("/pantry/items/{item_id}")
-async def delete_pantry_item(item_id: int, token_payload: dict = Depends(verify_token)):
+async def delete_pantry_item_endpoint(item_id: int, user_id: str = Query("")):
     """Delete pantry item."""
-    from src.models import delete_pantry_item
+    from src.models import get_or_create_user_by_key, delete_pantry_item
 
-    user_id = token_payload["user_id"]
-    delete_pantry_item(user_id, item_id)
+    user = get_or_create_user_by_key(user_id)
+    delete_pantry_item(user.id, item_id)
     return {"status": "ok"}
 
 
 @app.delete("/pantry")
-async def clear_pantry(token_payload: dict = Depends(verify_token)):
+async def clear_pantry_endpoint(user_id: str = Query("")):
     """Clear user's entire pantry."""
-    from src.models import clear_pantry
+    from src.models import get_or_create_user_by_key, clear_pantry
 
-    user_id = token_payload["user_id"]
-    clear_pantry(user_id)
-    return {"status": "ok"}
+    user = get_or_create_user_by_key(user_id)
+    deleted = clear_pantry(user.id)
+    return {"deleted": deleted}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -313,47 +323,60 @@ async def clear_pantry(token_payload: dict = Depends(verify_token)):
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-@app.get("/recalls", response_model=List[RecallResponse])
+class RecallsResponse(BaseModel):
+    total: int
+    recalls: List[RecallResponse]
+    updated_at: Optional[str] = None
+
+
+@app.get("/recalls", response_model=RecallsResponse)
 async def get_recalls(
-    skip: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    severity: Optional[str] = None,
+    source: Optional[str] = None,
+    status: Optional[str] = None,
+    q: Optional[str] = None,
 ):
-    """Get latest recalls (paginated, optionally filtered by severity)."""
-    from src.store import get_all_recalls
+    """Get latest recalls (paginated, with optional source/status/q filters)."""
+    from src.store import get_all_recalls, get_recall_count, get_cache_updated_at
 
-    recalls = get_all_recalls(skip=skip, limit=limit)
-    return [
-        {
-            "recall_number": r["recall_number"],
-            "product_description": r.get("product_description", ""),
-            "reason_for_recall": r.get("reason_for_recall"),
-            "recall_initiation_date": r.get("recall_initiation_date"),
-        }
-        for r in recalls
-    ]
+    recalls = get_all_recalls(skip=offset, limit=limit, source=source, status=status, q=q)
+    total = get_recall_count(source=source, status=status, q=q)
+
+    def field(x, key):
+        if isinstance(x, dict):
+            return x.get(key)
+        return getattr(x, key, None)
+
+    return {
+        "total": total,
+        "updated_at": get_cache_updated_at(),
+        "recalls": [
+            {
+                "recall_number": field(r, "recall_number"),
+                "product_description": field(r, "product_description"),
+                "reason_for_recall": field(r, "reason_for_recall"),
+                "recall_initiation_date": field(r, "recall_initiation_date"),
+                "severity": field(r, "severity"),
+                "brands": field(r, "brands") or [],
+                "lots": field(r, "lots") or [],
+            }
+            for r in recalls
+        ],
+    }
 
 
-@app.get("/recalls/matching")
-async def get_matching_recalls(token_payload: dict = Depends(verify_token)):
-    """Get recalls matching user's pantry."""
-    from src.models import get_pantry, get_alerts
-    from src.agent import parse_recall
+@app.post("/match")
+async def match_pantry(user_id: str = Query("")):
+    """Return pantry match candidates.
 
-    user_id = token_payload["user_id"]
-    pantry = get_pantry(user_id)
-    alerts = get_alerts(user_id)
+    Current lightweight implementation returns an empty list while preserving
+    the frontend contract.
+    """
+    from src.models import get_or_create_user_by_key
 
-    return [
-        {
-            "alert_id": a.id,
-            "recall_number": a.recall_number,
-            "message": a.message,
-            "status": a.status,
-            "created_at": a.created_at,
-        }
-        for a in alerts
-    ]
+    get_or_create_user_by_key(user_id)
+    return {"matches": []}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -361,17 +384,51 @@ async def get_matching_recalls(token_payload: dict = Depends(verify_token)):
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-@app.put("/alerts/{alert_id}/feedback")
-async def submit_feedback(alert_id: int, feedback: AlertFeedback, token_payload: dict = Depends(verify_token)):
-    """Submit feedback for an alert (disposed/ignored)."""
-    from src.models import update_alert_feedback
+@app.get("/alerts")
+async def get_alerts_endpoint(user_id: str = Query(""), status: Optional[str] = None):
+    """Get alerts for the current user."""
+    from src.models import get_or_create_user_by_key, get_alerts
 
-    user_id = token_payload["user_id"]
-    updated = update_alert_feedback(user_id, alert_id, feedback.status)
+    user = get_or_create_user_by_key(user_id)
+    alerts = get_alerts(user.id)
+    if status:
+        alerts = [a for a in alerts if a.status == status]
+
     return {
-        "status": "ok",
-        "alert_id": alert_id,
-        "feedback": feedback.status,
+        "alerts": [
+            {
+                "id": a.id,
+                "user_id": a.user_id,
+                "recall_id": a.recall_id,
+                "recall_number": a.recall_number,
+                "message": a.message,
+                "status": a.status,
+                "created_at": a.created_at,
+                "responded_at": a.responded_at,
+            }
+            for a in alerts
+        ]
+    }
+
+
+@app.patch("/alerts/{alert_id}/feedback")
+async def submit_feedback(alert_id: int, feedback: AlertFeedback, user_id: str = Query("")):
+    """Submit feedback for an alert (disposed/ignored)."""
+    from src.models import get_or_create_user_by_key, update_alert_feedback
+
+    user = get_or_create_user_by_key(user_id)
+    updated = update_alert_feedback(user.id, alert_id, feedback.status)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return {
+        "id": updated.id,
+        "user_id": updated.user_id,
+        "recall_id": updated.recall_id,
+        "recall_number": updated.recall_number,
+        "message": updated.message,
+        "status": updated.status,
+        "created_at": updated.created_at,
+        "responded_at": updated.responded_at,
     }
 
 
@@ -429,6 +486,19 @@ async def broadcast_alert(user_id: int, alert_message: dict):
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+@app.post("/fetch")
+async def trigger_fetch():
+    """Manually trigger a recall fetch and alert cycle."""
+    try:
+        from src.polling import poll_and_alert
+        import asyncio
+        asyncio.create_task(poll_and_alert())
+        return {"status": "triggered"}
+    except Exception as e:
+        logger.exception("Fetch trigger error: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Cloud Run."""
@@ -451,7 +521,7 @@ async def root():
 
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
-    telegram_id: int = 0
+    user_id: str = ""
 
 
 class ChatResponse(BaseModel):
@@ -464,22 +534,24 @@ async def chat(request: ChatRequest):
     try:
         from src import agent
         
-        user_id = request.telegram_id or 0
+        from src.models import get_or_create_user_by_key
+
+        user = get_or_create_user_by_key(request.user_id)
         message = request.message.strip()
         
         # Get user's pantry if registered
         pantry = []
         try:
             from src.models import get_pantry
-            pantry = get_pantry(user_id)
+            pantry = get_pantry(user.id)
         except Exception:
             pass
         
         # Build context
         pantry_str = ""
         if pantry:
-            items = [f"{item.get('product_name', '?')}" + 
-                     (f" ({item.get('brand', '')})" if item.get('brand') else "") 
+            items = [f"{getattr(item, 'product_name', '?')}" + 
+                     (f" ({getattr(item, 'brand', '')})" if getattr(item, 'brand', None) else "") 
                      for item in pantry]
             pantry_str = f"\nUser's pantry items: {', '.join(items)}"
         
@@ -506,23 +578,20 @@ async def chat(request: ChatRequest):
 
 
 @app.get("/stats", response_model=StatsResponse)
-async def get_stats(telegram_id: int = Query(..., ge=0)):
+async def get_stats(user_id: str = Query("")):
     """Get user statistics."""
-    from src.models import get_session
+    from src.models import get_session, get_or_create_user_by_key
     from src.store import get_recall_count, get_cache_updated_at
     from sqlmodel import select
-    
+
+    user = get_or_create_user_by_key(user_id)
     with get_session() as session:
-        # Pantry items count
         pantry_items = session.exec(
-            select(PantryItem).where(PantryItem.user_id == telegram_id)
+            select(PantryItem).where(PantryItem.user_id == user.id)
         ).all()
-        
-        # Alerts counts
         alerts = session.exec(
-            select(Alert).where(Alert.user_id == telegram_id)
+            select(Alert).where(Alert.user_id == user.id)
         ).all()
-        
         total_alerts = len(alerts)
         disposed = sum(1 for a in alerts if a.status == "disposed")
         ignored = sum(1 for a in alerts if a.status == "ignored")
@@ -544,48 +613,48 @@ async def get_stats(telegram_id: int = Query(..., ge=0)):
 
 
 @app.get("/notifications/email", response_model=EmailSettings)
-async def get_email_settings(telegram_id: int = Query(..., ge=0)):
+async def get_email_settings(user_id: str = Query("")):
     """Get user's email notification settings."""
-    from src.models import get_session
+    from src.models import get_or_create_user_by_key, get_session
     from sqlmodel import select
-    
-    with get_session() as session:
-        user = session.exec(
-            select(User).where(User.telegram_id == telegram_id)
-        ).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        return EmailSettings(
-            email=user.email or "",
-            notify_new_only=user.notify_new_only,
-        )
+
+    user = get_or_create_user_by_key(user_id)
+    return EmailSettings(
+        email=user.email or "",
+        notify_new_only=user.notify_new_only,
+    )
 
 
 @app.post("/notifications/email")
 async def save_email_settings(
     settings: EmailSettingsUpdate,
-    telegram_id: int = Query(..., ge=0)
+    user_id: str = Query("")
 ):
     """Save user's email notification settings."""
-    from src.models import get_user_by_telegram_id, get_session
+    from src.models import get_or_create_user_by_key, get_session
     from sqlmodel import select
-    
+
     with get_session() as session:
         user = session.exec(
-            select(User).where(User.telegram_id == telegram_id)
+            select(User).where(User.user_key == user_id)
         ).first()
         if not user:
-            # Create user if not exists
-            user = User(
-                telegram_id=telegram_id,
-                email=settings.email,
-                notify_new_only=settings.notify_new_only,
-            )
+            user = User(user_key=user_id, email=settings.email, notify_new_only=settings.notify_new_only)
             session.add(user)
         else:
             user.email = settings.email
             user.notify_new_only = settings.notify_new_only
         session.commit()
-    
+
+    return {"status": "saved"}
+
+
+@app.post("/notifications/settings")
+async def save_notification_settings(
+    body: dict,
+    user_id: str = Query("")
+):
+    """Save user's notification preferences to localStorage-compatible response."""
+    # Preferences (language, threshold, sources) are stored client-side;
+    # this endpoint is a no-op acknowledgement so the frontend call succeeds.
     return {"status": "saved"}

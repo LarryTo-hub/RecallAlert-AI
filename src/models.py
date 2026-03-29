@@ -20,10 +20,11 @@ _engine = create_engine(DATABASE_URL, echo=False)
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    telegram_id: int = Field(unique=True, index=True)
-    language: str = Field(default="en")  # en, es, vi, …
+    telegram_id: int = Field(default=0, index=True)
+    user_key: Optional[str] = Field(default=None, unique=True, index=True)  # UUID for web users
+    language: str = Field(default="en")
     email: Optional[str] = Field(default=None, index=True)
-    notify_new_only: bool = Field(default=True)  # True = new recalls only, False = all pantry matches
+    notify_new_only: bool = Field(default=True)
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -50,9 +51,21 @@ class Alert(SQLModel, table=True):
 
 # ── DB helpers ────────────────────────────────────────────────────────────
 
+from sqlalchemy import text
+
+# ── DB helpers ────────────────────────────────────────────────────────────
+
 def init_models_db() -> None:
-    """Create all model tables if they don't exist."""
+    """Create all model tables if they don't exist, and run lightweight migrations."""
     SQLModel.metadata.create_all(_engine)
+    # Migrate: add user_key column if it doesn't exist yet
+    with _engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE user ADD COLUMN user_key TEXT"))
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_user_user_key ON user (user_key)"))
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
 
 
 def get_session() -> Session:
@@ -67,6 +80,19 @@ def get_or_create_user(telegram_id: int, language: str = "en") -> User:
         if user:
             return user
         user = User(telegram_id=telegram_id, language=language)
+        sess.add(user)
+        sess.commit()
+        sess.refresh(user)
+        return user
+
+
+def get_or_create_user_by_key(user_key: str, language: str = "en") -> User:
+    """Get or create a web user identified by UUID key."""
+    with get_session() as sess:
+        user = sess.exec(select(User).where(User.user_key == user_key)).first()
+        if user:
+            return user
+        user = User(user_key=user_key, language=language)
         sess.add(user)
         sess.commit()
         sess.refresh(user)

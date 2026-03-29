@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  saveNotificationSettings, getTelegramId,
+  saveNotificationSettings,
   saveEmailSettings, getEmailSettings,
 } from "@/api/client";
 
@@ -59,7 +59,6 @@ export default function Notifications() {
       Promise.all([
         saveEmailSettings({ email, notify_new_only: notifyNewOnly }),
         saveNotificationSettings({
-          telegram_id: getTelegramId(),
           language,
           severity_threshold: threshold,
           sources,
