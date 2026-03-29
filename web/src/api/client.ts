@@ -97,17 +97,17 @@ export async function fetchRecalls(params?: {
   if (params?.source) sp.set("source", params.source);
   if (params?.status) sp.set("status", params.status);
   if (params?.q) sp.set("q", params.q);
-  return request(`/api/recalls?${sp}`);
+  return request(`/recalls?${sp}`);
 }
 
 export async function triggerFetch(): Promise<{ count: number }> {
-  return request("/api/fetch", { method: "POST" });
+  return request("/fetch", { method: "POST" });
 }
 
 // ── Pantry ─────────────────────────────────────────────────────────────────
 
 export async function fetchPantry(): Promise<{ items: PantryItem[] }> {
-  return request(`/api/pantry?telegram_id=${getTelegramId()}`);
+  return request(`/pantry?telegram_id=${getTelegramId()}`);
 }
 
 export async function addPantryItem(body: {
@@ -115,22 +115,22 @@ export async function addPantryItem(body: {
   brand?: string;
   lot_code?: string;
 }): Promise<PantryItem> {
-  return request(`/api/pantry?telegram_id=${getTelegramId()}`, {
+  return request(`/pantry?telegram_id=${getTelegramId()}`, {
     method: "POST",
     body: JSON.stringify(body),
   });
 }
 
 export async function deletePantryItem(id: number): Promise<void> {
-  return request(`/api/pantry/${id}?telegram_id=${getTelegramId()}`, { method: "DELETE" });
+  return request(`/pantry/${id}?telegram_id=${getTelegramId()}`, { method: "DELETE" });
 }
 
 export async function clearPantry(): Promise<{ deleted: number }> {
-  return request(`/api/pantry?telegram_id=${getTelegramId()}`, { method: "DELETE" });
+  return request(`/pantry?telegram_id=${getTelegramId()}`, { method: "DELETE" });
 }
 
 export function pantryExportUrl(): string {
-  return `${BASE}/api/pantry/export?telegram_id=${getTelegramId()}`;
+  return `${BASE}/pantry/export?telegram_id=${getTelegramId()}`;
 }
 
 // ── OCR ────────────────────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ export function pantryExportUrl(): string {
 export async function ocrReceipt(file: File): Promise<{ items: OcrItem[] }> {
   const fd = new FormData();
   fd.append("file", file);
-  const res = await fetch(`${BASE}/api/ocr`, { method: "POST", body: fd });
+  const res = await fetch(`${BASE}/ocr`, { method: "POST", body: fd });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail ?? "OCR failed");
@@ -149,7 +149,7 @@ export async function ocrReceipt(file: File): Promise<{ items: OcrItem[] }> {
 // ── Match ──────────────────────────────────────────────────────────────────
 
 export async function matchPantry(): Promise<{ matches: MatchResult[] }> {
-  return request(`/api/match?telegram_id=${getTelegramId()}`, { method: "POST" });
+  return request(`/match?telegram_id=${getTelegramId()}`, { method: "POST" });
 }
 
 // ── Alerts ─────────────────────────────────────────────────────────────────
@@ -157,14 +157,14 @@ export async function matchPantry(): Promise<{ matches: MatchResult[] }> {
 export async function fetchAlerts(status?: string): Promise<{ alerts: AlertRecord[] }> {
   const sp = new URLSearchParams({ telegram_id: String(getTelegramId()) });
   if (status) sp.set("status", status);
-  return request(`/api/alerts?${sp}`);
+  return request(`/alerts?${sp}`);
 }
 
 export async function updateAlertFeedback(
   id: number,
   status: "disposed" | "ignored"
 ): Promise<AlertRecord> {
-  return request(`/api/alerts/${id}/feedback?telegram_id=${getTelegramId()}`, {
+  return request(`/alerts/${id}/feedback?telegram_id=${getTelegramId()}`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
   });
@@ -173,7 +173,7 @@ export async function updateAlertFeedback(
 // ── Telegram ───────────────────────────────────────────────────────────────
 
 export async function testTelegram(chat_id: number, language: string): Promise<{ status: string }> {
-  return request("/api/telegram/test", {
+  return request("/telegram/test", {
     method: "POST",
     body: JSON.stringify({ chat_id, language }),
   });
@@ -185,7 +185,7 @@ export async function saveNotificationSettings(body: {
   severity_threshold: string;
   sources: string;
 }): Promise<unknown> {
-  return request("/api/notifications/settings", {
+  return request("/notifications/settings", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -195,20 +195,20 @@ export async function saveEmailSettings(body: {
   email: string;
   notify_new_only: boolean;
 }): Promise<unknown> {
-  return request(`/api/notifications/email?telegram_id=${getTelegramId()}`, {
+  return request(`/notifications/email?telegram_id=${getTelegramId()}`, {
     method: "POST",
     body: JSON.stringify(body),
   });
 }
 
 export async function getEmailSettings(): Promise<{ email: string; notify_new_only: boolean }> {
-  return request(`/api/notifications/email?telegram_id=${getTelegramId()}`);
+  return request(`/notifications/email?telegram_id=${getTelegramId()}`);
 }
 
 // ── Stats ──────────────────────────────────────────────────────────────────
 
 export async function fetchStats(): Promise<Stats> {
-  return request(`/api/stats?telegram_id=${getTelegramId()}`);
+  return request(`/stats?telegram_id=${getTelegramId()}`);
 }
 
 // ── Chat (AI) ──────────────────────────────────────────────────────────────
