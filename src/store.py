@@ -203,3 +203,22 @@ def get_all_recalls(skip: int = 0, limit: int = 20) -> list:
                 select(Recall).order_by(Recall.id.desc()).offset(skip).limit(limit)
             ).all()
             return list(recalls)
+
+
+def get_recall_count() -> int:
+    """Get total number of recalls in storage."""
+    if STORE_BACKEND == "firebase":
+        # For Firestore, get count
+        return len(list(_firestore_client.collection("recalls").stream()))
+    else:
+        # For SQLite
+        from sqlmodel import func
+        with Session(_engine) as sess:
+            count = sess.exec(select(func.count(Recall.id))).first()
+            return count or 0
+
+
+def get_cache_updated_at() -> Optional[str]:
+    """Get the last cache update timestamp."""
+    # For now, return None; could be implemented with a metadata table
+    return None

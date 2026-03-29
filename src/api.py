@@ -24,6 +24,9 @@ import jwt
 from pathlib import Path
 from dotenv import load_dotenv
 
+from sqlmodel import select, Session
+from src.models import User, PantryItem, Alert
+
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 logger = logging.getLogger(__name__)
@@ -94,6 +97,26 @@ class AlertFeedback(BaseModel):
     status: str = Field(..., pattern="^(disposed|ignored)$")
 
 
+class StatsResponse(BaseModel):
+    total_recalls: int
+    active_recalls: int
+    pantry_items: int
+    total_alerts: int
+    disposed: int
+    ignored: int
+    cache_updated_at: Optional[str]
+
+
+class EmailSettings(BaseModel):
+    email: str
+    notify_new_only: bool
+
+
+class EmailSettingsUpdate(BaseModel):
+    email: str
+    notify_new_only: bool
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Security
 # ──────────────────────────────────────────────────────────────────────────────
@@ -136,7 +159,7 @@ app = FastAPI(
 )
 
 # Enable CORS for React frontend
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -480,3 +503,88 @@ async def chat(request: ChatRequest):
     except Exception as e:
         logger.exception("Chat error: %s", e)
         return ChatResponse(reply="Sorry, I'm having trouble responding right now. Please try again later.")
+
+
+@app.get("/stats", response_model=StatsResponse)
+async def get_stats(telegram_id: int = Query(..., ge=0)):
+    """Get user statistics."""
+    from src.models import get_session
+    from src.store import get_recall_count, get_cache_updated_at
+    
+    with get_session() as session:
+        # Pantry items count
+        pantry_items = session.exec(
+            select(PantryItem).where(PantryItem.user_id == telegram_id)
+        ).all()
+        
+        # Alerts counts
+        alerts = session.exec(
+            select(Alert).where(Alert.user_id == telegram_id)
+        ).all()
+        
+        total_alerts = len(alerts)
+        disposed = sum(1 for a in alerts if a.status == "disposed")
+        ignored = sum(1 for a in alerts if a.status == "ignored")
+    
+    # Recalls from store
+    total_recalls = get_recall_count()
+    active_recalls = total_recalls  # For now, assume all are active; could filter by status
+    cache_updated_at = get_cache_updated_at()
+    
+    return StatsResponse(
+        total_recalls=total_recalls,
+        active_recalls=active_recalls,
+        pantry_items=len(pantry_items),
+        total_alerts=total_alerts,
+        disposed=disposed,
+        ignored=ignored,
+        cache_updated_at=cache_updated_at,
+    )
+
+
+@app.get("/notifications/email", response_model=EmailSettings)
+async def get_email_settings(telegram_id: int = Query(..., ge=0)):
+    """Get user's email notification settings."""
+    from src.models import get_session
+    from sqlmodel import select
+    
+    with get_session() as session:
+        user = session.exec(
+            select(User).where(User.telegram_id == telegram_id)
+        ).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return EmailSettings(
+            email=user.email or "",
+            notify_new_only=user.notify_new_only,
+        )
+
+
+@app.post("/notifications/email")
+async def save_email_settings(
+    settings: EmailSettingsUpdate,
+    telegram_id: int = Query(..., ge=0)
+):
+    """Save user's email notification settings."""
+    from src.models import get_user_by_telegram_id, get_session
+    from sqlmodel import select
+    
+    with get_session() as session:
+        user = session.exec(
+            select(User).where(User.telegram_id == telegram_id)
+        ).first()
+        if not user:
+            # Create user if not exists
+            user = User(
+                telegram_id=telegram_id,
+                email=settings.email,
+                notify_new_only=settings.notify_new_only,
+            )
+            session.add(user)
+        else:
+            user.email = settings.email
+            user.notify_new_only = settings.notify_new_only
+        session.commit()
+    
+    return {"status": "saved"}
