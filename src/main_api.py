@@ -99,22 +99,17 @@ app.router.lifespan_context = lifespan
 # ──────────────────────────────────────────────────────────────────────────────
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-FRONTEND_DIR = BASE_DIR / "web" / "dist"   # change to "build" if needed
+FRONTEND_DIR = BASE_DIR / "web" / "dist"
+
+logger.info(f"Looking for frontend at: {FRONTEND_DIR}")
+logger.info(f"Frontend dir exists: {FRONTEND_DIR.exists()}")
 
 if FRONTEND_DIR.exists():
-    # Serve static assets (JS, CSS, etc.)
-    assets_dir = FRONTEND_DIR / "assets"
-    if assets_dir.exists():
-        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
-
-    # Serve React app for all non-API routes
-    @app.get("/{full_path:path}")
-    async def serve_frontend(full_path: str):
-        return FileResponse(FRONTEND_DIR / "index.html")
-
-    logger.info("📁 Serving React frontend from %s", FRONTEND_DIR)
+    logger.info(f"✅ Mounting React frontend from {FRONTEND_DIR}")
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="static")
 else:
-    logger.warning("⚠️ Frontend build folder not found at %s", FRONTEND_DIR)
+    logger.warning(f"⚠️  Frontend build folder not found at {FRONTEND_DIR}")
+    logger.warning("Frontend will NOT be served. Only API endpoints available.")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
