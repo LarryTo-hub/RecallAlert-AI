@@ -1,6 +1,8 @@
 /** Typed API client for the RecallAlert FastAPI backend. */
 
-const BASE = import.meta.env.VITE_API_URL ?? "";
+const BASE =
+  import.meta.env.VITE_API_URL ??
+  (window.location.hostname === "localhost" ? "http://localhost:8000" : "");
 
 export function getTelegramId(): number {
   return Number(localStorage.getItem("telegram_id") ?? "0");
