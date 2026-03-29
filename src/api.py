@@ -412,7 +412,7 @@ async def health_check():
     return {"status": "ok"}
 
 
-@app.get("/")
+@app.get("/api")
 async def root():
     """Welcome endpoint."""
     return {

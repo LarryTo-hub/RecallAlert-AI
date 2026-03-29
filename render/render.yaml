@@ -3,7 +3,7 @@ services:
   - type: web
     name: recall-alert-api
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && cd web && npm install && npm run build
     startCommand: python -m uvicorn src.main_api:app --host 0.0.0.0 --port $PORT
     autoDeploy: true
     envVars:
@@ -17,6 +17,10 @@ services:
         value: INFO
       - key: FETCH_INTERVAL_MINUTES
         value: "60"
+      - key: NODE_VERSION
+        value: 18
+      - key: PYTHON_VERSION
+        value: 3.11
       # Secrets (set in Render dashboard)
       - key: GOOGLE_API_KEY
         sync: false
@@ -45,6 +49,7 @@ services:
         value: INFO
       - key: FETCH_INTERVAL_MINUTES
         value: "60"
+      
       # Secrets (same as web service)
       - key: GOOGLE_API_KEY
         sync: false
@@ -53,3 +58,6 @@ services:
       - key: FIREBASE_CRED_PATH
         value: /tmp/firebase-cred.json
     plan: starter
+
+
+
