@@ -325,10 +325,10 @@ async def get_recalls(
     recalls = get_all_recalls(skip=skip, limit=limit)
     return [
         {
-            "recall_number": r.recall_number,
-            "product_description": r.product_description,
-            "reason_for_recall": r.reason_for_recall,
-            "recall_initiation_date": r.recall_initiation_date,
+            "recall_number": r["recall_number"],
+            "product_description": r.get("product_description", ""),
+            "reason_for_recall": r.get("reason_for_recall"),
+            "recall_initiation_date": r.get("recall_initiation_date"),
         }
         for r in recalls
     ]
@@ -510,6 +510,7 @@ async def get_stats(telegram_id: int = Query(..., ge=0)):
     """Get user statistics."""
     from src.models import get_session
     from src.store import get_recall_count, get_cache_updated_at
+    from sqlmodel import select
     
     with get_session() as session:
         # Pantry items count

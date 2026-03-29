@@ -202,7 +202,7 @@ def get_all_recalls(skip: int = 0, limit: int = 20) -> list:
             recalls = sess.exec(
                 select(Recall).order_by(Recall.id.desc()).offset(skip).limit(limit)
             ).all()
-            return list(recalls)
+            return [r.model_dump() for r in recalls]
 
 
 def get_recall_count() -> int:
