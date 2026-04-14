@@ -11,6 +11,8 @@ import os
 import re
 import hashlib
 import logging
+from datetime import datetime
+from urllib.parse import urlparse
 from typing import Optional, Dict, Any
 
 from dotenv import load_dotenv
@@ -26,6 +28,93 @@ STORE_BACKEND = os.getenv("STORE_BACKEND", DEFAULT_BACKEND).lower()
 
 # ---------- Firebase / Firestore ----------
 _firestore_client = None
+
+
+def _norm_text(value: Optional[str]) -> str:
+    return re.sub(r"\s+", " ", (value or "").strip().lower())
+
+
+def _norm_recall_number(value: Optional[str]) -> str:
+    # Keep alnum + dash and normalize casing/spacing for stable comparisons.
+    raw = (value or "").strip().upper()
+    if not raw:
+        return ""
+    return re.sub(r"\s+", "", raw)
+
+
+def _canonical_record_key(record: Dict[str, Any]) -> str:
+    """Stable key for deduping equivalent recalls across sources."""
+    recall_number = _norm_recall_number(record.get("recall_number"))
+    if recall_number:
+        return f"rn:{recall_number}"
+
+    # USDA and some FDA entries may omit recall_number; URL slug is often stable.
+    url = (record.get("url") or "").strip()
+    if url:
+        try:
+            parsed = urlparse(url)
+            slug = _norm_text(parsed.path.rsplit("/", 1)[-1])
+            if slug:
+                return f"url:{slug}"
+        except Exception:
+            pass
+
+    # For records without recall numbers, dedupe by core content, not source/date.
+    product = _norm_text(record.get("product_description"))
+    reason = _norm_text(record.get("reason_for_recall"))
+    company = _norm_text(record.get("company_name") or record.get("recalling_firm"))
+    return f"fallback:{product}|{reason}|{company}"
+
+
+def _dedupe_records(records: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
+    """Preserve input order while removing duplicate recall entries."""
+    seen = set()
+    deduped = []
+    for record in records:
+        key = _canonical_record_key(record)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(record)
+    return deduped
+
+
+def _parse_recall_date(value: Optional[str]) -> Optional[datetime]:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+
+    # Known source date formats across FDA/USDA feeds.
+    for fmt in (
+        "%Y-%m-%d",
+        "%Y%m%d",
+        "%m/%d/%Y",
+        "%a, %m/%d/%Y",
+        "%B %d, %Y",
+        "%b %d, %Y",
+    ):
+        try:
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _recall_sort_key(record: Dict[str, Any]) -> tuple[datetime, int]:
+    report_dt = _parse_recall_date(record.get("report_date"))
+    init_dt = _parse_recall_date(record.get("recall_initiation_date"))
+    best_dt = report_dt or init_dt or datetime.min
+
+    try:
+        row_id = int(record.get("id") or 0)
+    except (TypeError, ValueError):
+        row_id = 0
+
+    return best_dt, row_id
+
+
+def _sort_recalls_latest_first(records: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
+    return sorted(records, key=_recall_sort_key, reverse=True)
 
 
 def _source_matches(value: Optional[str], source_filter: Optional[str]) -> bool:
@@ -76,8 +165,6 @@ def _record_matches(record: Dict[str, Any], source: Optional[str], status: Optio
 def _fallback_id(record: Dict[str, Any]) -> str:
     """Build a stable ID when recall_number is missing."""
     parts = [
-        str(record.get("source") or ""),
-        str(record.get("report_date") or record.get("recall_initiation_date") or ""),
         str(record.get("product_description") or ""),
         str(record.get("reason_for_recall") or ""),
         str(record.get("company_name") or record.get("recalling_firm") or ""),
@@ -136,7 +223,7 @@ def _firestore_save_if_new(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Save recall to Firestore if not already present (doc id = stable external id)."""
     _init_firestore()
 
-    recall_number = record.get("recall_number")
+    recall_number = _norm_recall_number(record.get("recall_number")) or None
     raw_doc_id = str(recall_number or _fallback_id(record))
     doc_id = _sanitize_doc_id(raw_doc_id)
     
@@ -197,7 +284,7 @@ def _sqlite_init_db() -> None:
 
 def _sqlite_save_if_new(record: dict) -> Optional[Recall]:
     with Session(_engine) as sess:
-        recall_number = str(record.get("recall_number") or "").strip()
+        recall_number = _norm_recall_number(record.get("recall_number"))
 
         if recall_number:
             q = select(Recall).where(Recall.recall_number == recall_number)
@@ -265,8 +352,16 @@ def get_all_recalls(
     source: Optional[str] = None,
     status: Optional[str] = None,
     q: Optional[str] = None,
+    sort: str = "latest",
 ) -> list:
-    """Get paginated list of recalls from storage."""
+    """Get paginated list of recalls from storage.
+
+    Args:
+        sort: ``"latest"`` (default) — newest date first;
+              ``"oldest"`` — oldest date first.
+    """
+    reverse = sort != "oldest"
+
     if STORE_BACKEND == "firebase":
         query = _firestore_client.collection("recalls")
         docs = query.stream()
@@ -275,7 +370,9 @@ def get_all_recalls(
             r for r in all_records
             if _record_matches(r, source=source, status=status, q=q)
         ]
-        return filtered[skip: skip + limit]
+        deduped = _dedupe_records(filtered)
+        ordered = sorted(deduped, key=_recall_sort_key, reverse=reverse)
+        return ordered[skip: skip + limit]
     else:
         # For SQLite, filter in Python to keep matching logic identical to Firestore.
         with Session(_engine) as sess:
@@ -286,7 +383,37 @@ def get_all_recalls(
                 r for r in all_records
                 if _record_matches(r, source=source, status=status, q=q)
             ]
-            return filtered[skip: skip + limit]
+            deduped = _dedupe_records(filtered)
+            ordered = sorted(deduped, key=_recall_sort_key, reverse=reverse)
+            return ordered[skip: skip + limit]
+
+
+def get_recall_by_id(recall_id: int) -> Optional[dict]:
+    """Get a recall by integer ID (SQLite only)."""
+    if STORE_BACKEND == "firebase":
+        # Firestore docs do not use integer IDs from SQLite.
+        return None
+
+    with Session(_engine) as sess:
+        recall = sess.get(Recall, recall_id)
+        return recall.model_dump() if recall else None
+
+
+def get_recall_by_number(recall_number: str) -> Optional[dict]:
+    """Get a recall by recall_number from the active backend."""
+    if not recall_number:
+        return None
+
+    if STORE_BACKEND == "firebase":
+        query = _firestore_client.collection("recalls").where("recall_number", "==", recall_number).limit(1)
+        docs = list(query.stream())
+        if not docs:
+            return None
+        return docs[0].to_dict()
+
+    with Session(_engine) as sess:
+        recall = sess.exec(select(Recall).where(Recall.recall_number == recall_number)).first()
+        return recall.model_dump() if recall else None
 
 
 def get_recall_count(
@@ -306,7 +433,11 @@ def get_recall_count(
             recalls = sess.exec(query).all()
             all_records = [r.model_dump() for r in recalls]
 
-    return sum(1 for r in all_records if _record_matches(r, source=source, status=status, q=q))
+    filtered = [
+        r for r in all_records
+        if _record_matches(r, source=source, status=status, q=q)
+    ]
+    return len(_dedupe_records(filtered))
 
 
 def get_cache_updated_at() -> Optional[str]:

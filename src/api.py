@@ -12,10 +12,11 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from datetime import datetime, timedelta
 from typing import Optional, List
 
-from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, Query
+from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, Field
@@ -326,6 +327,50 @@ async def clear_pantry_endpoint(user_id: str = Query("")):
     return {"deleted": deleted}
 
 
+@app.post("/ocr")
+async def ocr_receipt_endpoint(file: UploadFile = File(...)):
+    """Extract pantry items from an uploaded receipt image."""
+    from src.agent import ocr_receipt
+
+    # Accept common image types. Some mobile browsers send octet-stream.
+    if file.content_type and not (
+        file.content_type.startswith("image/")
+        or file.content_type == "application/octet-stream"
+    ):
+        raise HTTPException(status_code=400, detail="Please upload an image file")
+
+    try:
+        payload = await file.read()
+        if not payload:
+            raise HTTPException(status_code=400, detail="Empty file upload")
+
+        items = ocr_receipt(payload)
+        if not isinstance(items, list):
+            items = []
+
+        normalized = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            name = (item.get("product_name") or "").strip()
+            if not name:
+                continue
+            normalized.append(
+                {
+                    "product_name": name,
+                    "brand": (item.get("brand") or None),
+                    "lot_code": (item.get("lot_code") or None),
+                }
+            )
+
+        return {"items": normalized}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("OCR endpoint failed: %s", e)
+        raise HTTPException(status_code=500, detail="OCR failed")
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Recall Endpoints
 # ──────────────────────────────────────────────────────────────────────────────
@@ -344,11 +389,32 @@ async def get_recalls(
     source: Optional[str] = None,
     status: Optional[str] = None,
     q: Optional[str] = None,
+    sort: str = Query("latest", regex="^(latest|oldest)$"),
 ):
-    """Get latest recalls (paginated, with optional source/status/q filters)."""
+    """Get paginated recalls. ``sort`` accepts ``latest`` (default) or ``oldest``."""
     from src.store import get_all_recalls, get_recall_count, get_cache_updated_at
 
-    recalls = get_all_recalls(skip=offset, limit=limit, source=source, status=status, q=q)
+    def normalize_status(value: Optional[str]) -> Optional[str]:
+        if not value:
+            return value
+        lower = value.strip().lower()
+        if lower in {"ongoing", "on going", "on-going"}:
+            return "ACTIVE"
+        upper = value.strip().upper()
+        if upper in {"ACTIVE", "CLOSED", "TERMINATED"}:
+            return upper
+        return value.strip()
+
+    def normalize_date(value: Optional[str]) -> Optional[str]:
+        if not value:
+            return value
+        text = value.strip()
+        m = re.fullmatch(r"(\d{4})(\d{2})(\d{2})", text)
+        if m:
+            return f"{m.group(2)}/{m.group(3)}/{m.group(1)}"
+        return text
+
+    recalls = get_all_recalls(skip=offset, limit=limit, source=source, status=status, q=q, sort=sort)
     total = get_recall_count(source=source, status=status, q=q)
 
     def field(x, key):
@@ -368,10 +434,10 @@ async def get_recalls(
                 "product_type": field(r, "product_type"),
                 "reason_for_recall": field(r, "reason_for_recall"),
                 "company_name": field(r, "company_name"),
-                "status": field(r, "status"),
+                "status": normalize_status(field(r, "status")),
                 "affected_area": field(r, "affected_area"),
-                "report_date": field(r, "report_date"),
-                "recall_initiation_date": field(r, "recall_initiation_date"),
+                "report_date": normalize_date(field(r, "report_date")),
+                "recall_initiation_date": normalize_date(field(r, "recall_initiation_date")),
                 "url": field(r, "url"),
                 "severity": field(r, "severity"),
                 "brands": field(r, "brands") or [],
@@ -384,15 +450,116 @@ async def get_recalls(
 
 @app.post("/match")
 async def match_pantry(user_id: str = Query("")):
-    """Return pantry match candidates.
+    """Match user's pantry items against stored recalls.
 
-    Current lightweight implementation returns an empty list while preserving
-    the frontend contract.
+    Returns a list shaped for the frontend `MatchResult` contract.
     """
-    from src.models import get_or_create_user_by_key
+    from src.models import get_or_create_user_by_key, get_pantry
+    from src.store import get_all_recalls
+    from src.agent import parse_recall, match_pantry as agent_match_pantry
 
-    get_or_create_user_by_key(user_id)
-    return {"matches": []}
+    user = get_or_create_user_by_key(user_id)
+    pantry = get_pantry(user.id)
+    if not pantry:
+        return {"matches": []}
+
+    pantry_dicts = [
+        {
+            "product_name": p.product_name,
+            "brand": p.brand,
+            "lot_code": p.lot_code,
+        }
+        for p in pantry
+    ]
+
+    # Gather likely candidate recalls by querying each pantry product term.
+    # If no candidates are found, fall back to the most recent recalls.
+    candidates = []
+    seen = set()
+    for item in pantry_dicts:
+        term = (item.get("product_name") or "").strip()
+        if not term:
+            continue
+
+        for recall in get_all_recalls(skip=0, limit=200, q=term):
+            key = (
+                recall.get("recall_number") or "",
+                recall.get("product_description") or "",
+                recall.get("report_date") or "",
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(recall)
+
+    if not candidates:
+        candidates = get_all_recalls(skip=0, limit=300)
+
+    def deterministic_match(recall: dict, pantry_items: List[dict]) -> List[dict]:
+        """Fallback matcher using direct text containment / token overlap."""
+        text = " ".join(
+            [
+                str(recall.get("product_description") or ""),
+                str(recall.get("brand_name") or ""),
+                str(recall.get("reason_for_recall") or ""),
+                str(recall.get("company_name") or ""),
+            ]
+        ).lower()
+
+        matched_items = []
+        for item in pantry_items:
+            name = str(item.get("product_name") or "").strip().lower()
+            brand = str(item.get("brand") or "").strip().lower()
+            if not name:
+                continue
+
+            # Strong signal: full pantry product string appears in recall text.
+            if name in text:
+                matched_items.append(item)
+                continue
+
+            # Secondary signal: at least 2 overlapping significant tokens.
+            item_tokens = {t for t in name.split() if len(t) > 2}
+            recall_tokens = {t for t in text.split() if len(t) > 2}
+            if len(item_tokens & recall_tokens) >= 2:
+                matched_items.append(item)
+                continue
+
+            # Brand-only match if user provided brand.
+            if brand and brand in text:
+                matched_items.append(item)
+
+        return matched_items
+
+    matches = []
+    for recall in candidates:
+        parsed = parse_recall(recall)
+        matched_items = agent_match_pantry(parsed, pantry_dicts)
+
+        # Guardrail: if LLM matcher misses obvious direct text matches, use deterministic fallback.
+        if not matched_items:
+            matched_items = deterministic_match(recall, pantry_dicts)
+
+        if not matched_items:
+            continue
+
+        parsed_payload = {
+            "severity": parsed.get("severity") or "unknown",
+            "reason_summary": parsed.get("reason_summary")
+            or (recall.get("reason_for_recall") or ""),
+            "products": parsed.get("products") or [],
+            "brands": parsed.get("brands") or [],
+        }
+
+        matches.append(
+            {
+                "recall": recall,
+                "parsed": parsed_payload,
+                "matched_items": matched_items,
+            }
+        )
+
+    return {"matches": matches}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -430,12 +597,70 @@ async def get_alerts_endpoint(user_id: str = Query(""), status: Optional[str] = 
 @app.patch("/alerts/{alert_id}/feedback")
 async def submit_feedback(alert_id: int, feedback: AlertFeedback, user_id: str = Query("")):
     """Submit feedback for an alert (disposed/ignored)."""
-    from src.models import get_or_create_user_by_key, update_alert_feedback
+    from src.models import get_or_create_user_by_key, update_alert_feedback, get_pantry, delete_pantry_item
+    from src.store import get_recall_by_id, get_recall_by_number
+    from src.agent import parse_recall, match_pantry as agent_match_pantry
 
     user = get_or_create_user_by_key(user_id)
     updated = update_alert_feedback(user.id, alert_id, feedback.status)
     if not updated:
         raise HTTPException(status_code=404, detail="Alert not found")
+
+    pantry_items_removed = 0
+    if feedback.status == "disposed":
+        recall = None
+        if updated.recall_id:
+            recall = get_recall_by_id(updated.recall_id)
+        if recall is None and updated.recall_number:
+            recall = get_recall_by_number(updated.recall_number)
+
+        if recall:
+            pantry = get_pantry(user.id)
+            pantry_dicts = [
+                {
+                    "id": p.id,
+                    "product_name": p.product_name,
+                    "brand": p.brand,
+                    "lot_code": p.lot_code,
+                }
+                for p in pantry
+            ]
+
+            parsed = parse_recall(recall)
+            matched = agent_match_pantry(parsed, pantry_dicts)
+
+            # Guardrail deterministic fallback for obvious text matches.
+            if not matched:
+                text = " ".join(
+                    [
+                        str(recall.get("product_description") or ""),
+                        str(recall.get("brand_name") or ""),
+                        str(recall.get("reason_for_recall") or ""),
+                        str(recall.get("company_name") or ""),
+                    ]
+                ).lower()
+                matched = []
+                for item in pantry_dicts:
+                    name = str(item.get("product_name") or "").strip().lower()
+                    brand = str(item.get("brand") or "").strip().lower()
+                    if not name:
+                        continue
+                    if name in text:
+                        matched.append(item)
+                        continue
+                    item_tokens = {t for t in name.split() if len(t) > 2}
+                    recall_tokens = {t for t in text.split() if len(t) > 2}
+                    if len(item_tokens & recall_tokens) >= 2:
+                        matched.append(item)
+                        continue
+                    if brand and brand in text:
+                        matched.append(item)
+
+            for item in matched:
+                item_id = item.get("id")
+                if item_id and delete_pantry_item(user.id, item_id):
+                    pantry_items_removed += 1
+
     return {
         "id": updated.id,
         "user_id": updated.user_id,
@@ -445,6 +670,7 @@ async def submit_feedback(alert_id: int, feedback: AlertFeedback, user_id: str =
         "status": updated.status,
         "created_at": updated.created_at,
         "responded_at": updated.responded_at,
+        "pantry_items_removed": pantry_items_removed,
     }
 
 

@@ -54,10 +54,10 @@ async def poll_and_alert() -> None:
     if store_count == 0:
         logger.info("Empty store detected — performing full historical fetch (this may take a moment)…")
         fda_items = fetch_fda_recalls(limit=None)   # all available records
-        usda_items = fetch_usda_recalls(limit=100)
+        usda_items = fetch_usda_recalls(limit=None)
     else:
         fda_items = fetch_fda_recalls(limit=200)    # recent batch for incremental updates
-        usda_items = fetch_usda_recalls(limit=50)
+        usda_items = fetch_usda_recalls(limit=None)  # always full USDA crawl; dedup handles repeats
 
     all_items = fda_items + usda_items
     logger.info("Fetched %d FDA + %d USDA recalls", len(fda_items), len(usda_items))

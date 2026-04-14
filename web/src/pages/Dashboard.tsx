@@ -7,12 +7,17 @@ import { SkeletonCard } from "@/components/Skeleton";
 
 const SOURCES = ["All", "FDA", "USDA"];
 const STATUSES = ["All", "ACTIVE", "CLOSED", "TERMINATED"];
+const SORTS: Array<{ value: "latest" | "oldest"; label: string }> = [
+  { value: "latest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+];
 
 export default function Dashboard() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [source, setSource] = useState("All");
   const [status, setStatus] = useState("All");
+  const [sort, setSort] = useState<"latest" | "oldest">("latest");
   const [offset, setOffset] = useState(0);
   const LIMIT = 20;
 
@@ -21,6 +26,7 @@ export default function Dashboard() {
     offset,
     source: source !== "All" ? source : undefined,
     status: status !== "All" ? status : undefined,
+    sort,
   };
 
   const { data, isLoading, isError } = useQuery({
@@ -105,6 +111,18 @@ export default function Dashboard() {
               {s}
             </button>
           ))}
+        </div>
+        <div className="ml-auto">
+          <select
+            value={sort}
+            onChange={(e) => { setSort(e.target.value as "latest" | "oldest"); setOffset(0); }}
+            className="text-xs border border-gray-200 rounded-full px-3 py-1.5 bg-white text-gray-600 cursor-pointer hover:border-gray-300 focus:outline-none"
+            aria-label="Sort order"
+          >
+            {SORTS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
         </div>
       </div>
 

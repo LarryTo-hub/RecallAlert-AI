@@ -62,6 +62,7 @@ export interface AlertRecord {
   status: string;
   created_at: string;
   responded_at: string | null;
+  pantry_items_removed?: number;
 }
 
 export interface OcrItem {
@@ -94,6 +95,7 @@ export async function fetchRecalls(params?: {
   source?: string;
   status?: string;
   q?: string;
+  sort?: "latest" | "oldest";
 }): Promise<{ total: number; recalls: Recall[]; updated_at: string | null }> {
   const sp = new URLSearchParams();
   if (params?.limit) sp.set("limit", String(params.limit));
@@ -101,6 +103,7 @@ export async function fetchRecalls(params?: {
   if (params?.source) sp.set("source", params.source);
   if (params?.status) sp.set("status", params.status);
   if (params?.q) sp.set("q", params.q);
+  if (params?.sort) sp.set("sort", params.sort);
   return request(`/recalls?${sp}`);
 }
 

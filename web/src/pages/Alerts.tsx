@@ -18,7 +18,11 @@ function AlertRow({ alert }: { alert: AlertRecord }) {
   const mutation = useMutation({
     mutationFn: ({ status }: { status: "disposed" | "ignored" }) =>
       updateAlertFeedback(alert.id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["alerts"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["alerts"] });
+      qc.invalidateQueries({ queryKey: ["pantry"] });
+      qc.invalidateQueries({ queryKey: ["stats"] });
+    },
   });
 
   return (

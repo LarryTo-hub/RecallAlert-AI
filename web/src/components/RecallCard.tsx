@@ -13,8 +13,24 @@ const statusColors: Record<string, string> = {
   TERMINATED: "text-green-600",
 };
 
+/** Normalise raw API status values to canonical display labels. */
+function normalizeStatus(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const lower = raw.trim().toLowerCase();
+  if (lower === "ongoing" || lower === "on going" || lower === "on-going") return "ACTIVE";
+  return raw.trim().toUpperCase();
+}
+
+/** Convert YYYYMMDD → MM/DD/YYYY; leave other formats unchanged. */
+function formatDate(val: string | null | undefined): string {
+  if (!val) return "";
+  const m = val.trim().match(/^(\d{4})(\d{2})(\d{2})$/);
+  return m ? `${m[2]}/${m[3]}/${m[1]}` : val.trim();
+}
+
 export default function RecallCard({ recall, severity }: Props) {
-  const statusCls = statusColors[(recall.status ?? "").toUpperCase()] ?? "text-gray-500";
+  const displayStatus = normalizeStatus(recall.status);
+  const statusCls = statusColors[displayStatus ?? ""] ?? "text-gray-500";
   const sourceLabel = recall.source?.startsWith("FDA") ? "FDA" : "USDA";
   const sourceCls = sourceLabel === "FDA"
     ? "bg-blue-100 text-blue-700"
@@ -38,9 +54,9 @@ export default function RecallCard({ recall, severity }: Props) {
             </span>
           )}
         </div>
-        {recall.status && (
+        {displayStatus && (
           <span className={`text-xs font-medium shrink-0 ${statusCls}`}>
-            {recall.status}
+            {displayStatus}
           </span>
         )}
       </div>
@@ -69,7 +85,7 @@ export default function RecallCard({ recall, severity }: Props) {
           {recall.affected_area && <span>Area: {recall.affected_area}</span>}
         </div>
         <div className="flex items-center gap-3">
-          <span>{recall.report_date ?? recall.recall_initiation_date ?? ""}</span>
+          <span>{formatDate(recall.report_date ?? recall.recall_initiation_date)}</span>
           {recall.url && (
             <a
               href={recall.url}
