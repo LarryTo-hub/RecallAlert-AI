@@ -840,12 +840,8 @@ async def get_stats(user_id: str = Query("")):
     
     # Recalls from store
     total_recalls = get_recall_count()
-    # Different sources use different labels; count common "active" variants.
-    active_recalls = (
-        get_recall_count(status="ACTIVE")
-        + get_recall_count(status="Ongoing")
-        + get_recall_count(status="ONGOING")
-    )
+    # get_recall_count(status="ACTIVE") already treats ONGOING as ACTIVE.
+    active_recalls = get_recall_count(status="ACTIVE")
     cache_updated_at = get_cache_updated_at()
     
     return StatsResponse(
