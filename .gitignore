@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.venv\
+
+# VS Code
+.vscode/
+
+# Environment
+.env
+.env.production
+.env.local
+!.env.example
+!web/.env.local
+!web/.env.production
+!render/.env.render
+
+# Database
+*.db
+
+# Secrets
+secrets/
+
+
+recalls.db
+
+# Node / frontend
+web/node_modules/
+web/dist/
+web/.vite/
+
+# Firebase credentials
+*serviceAccount*.json
+firebase-creds*.json

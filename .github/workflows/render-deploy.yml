@@ -1,0 +1,25 @@
+# GitHub Actions workflow for Render deployment (optional)
+# This is for reference - Render has built-in GitHub integration
+# No need to use this if you use Render's dashboard auto-deploy
+
+name: Deploy to Render
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy to Render
+        run: |
+          # Trigger render redeploy via API
+          # https://api.render.com/docs
+          echo "Render will auto-deploy on GitHub push (no webhook needed)"
+          echo "Services deploying:"
+          echo "  - recall-alert-api (Web Service)"
+          echo "  - recall-alert-poller (Background Worker)"

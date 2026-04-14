@@ -1,0 +1,54 @@
+# .gcloudignore — files to exclude from Cloud Run deployment
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+.venv/
+venv/
+.venv
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Local development
+.env
+.env.local
+recalls.db
+recalls.db-journal
+
+# Demo/Scripts
+demo/
+scripts/
+TUTORIAL.md
+
+# Tests
+tests/
+test_*.py
+*_test.py
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Misc
+.github/
+.editorconfig

@@ -1,0 +1,241 @@
+{
+  "fda": [
+    {
+      "source": "FDA-web",
+      "recall_number": null,
+      "brand_name": "Good Brain Tonic",
+      "brand_names": "Good Brain Tonic",
+      "product_description": "Good Brain Tonic 16 oz & 32 oz",
+      "product_type": "Food & Beverages, Foodborne Illness, Carbonated Soft Drinks",
+      "reason_for_recall": "Potential Foodborne Illness -Botulism",
+      "company_name": "Liquid Blenz Corp",
+      "status": "ACTIVE",
+      "affected_area": null,
+      "report_date": "04/14/2026",
+      "recall_initiation_date": "04/14/2026",
+      "url": "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts",
+      "raw": {
+        "date": "04/14/2026",
+        "brand_names": "Good Brain Tonic",
+        "product_description": "Good Brain Tonic 16 oz & 32 oz",
+        "product_type": "Food & Beverages, Foodborne Illness, Carbonated Soft Drinks",
+        "reason_for_recall": "Potential Foodborne Illness -Botulism",
+        "company_name": "Liquid Blenz Corp",
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "source": "FDA-web",
+      "recall_number": null,
+      "brand_name": "Morovan",
+      "brand_names": "Morovan",
+      "product_description": "Gel Nail Polish Remover (15ml)",
+      "product_type": "Cosmetics",
+      "reason_for_recall": "Prohibited Methylene Chloride and Chloroform",
+      "company_name": "Morovan",
+      "status": "ACTIVE",
+      "affected_area": null,
+      "report_date": "04/13/2026",
+      "recall_initiation_date": "04/13/2026",
+      "url": "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts",
+      "raw": {
+        "date": "04/13/2026",
+        "brand_names": "Morovan",
+        "product_description": "Gel Nail Polish Remover (15ml)",
+        "product_type": "Cosmetics",
+        "reason_for_recall": "Prohibited Methylene Chloride and Chloroform",
+        "company_name": "Morovan",
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "source": "FDA-web",
+      "recall_number": null,
+      "brand_name": "Vital Nutrient",
+      "brand_names": "Vital Nutrient",
+      "product_description": "Aller-C Dietary Supplement",
+      "product_type": "Dietary Supplements",
+      "reason_for_recall": "Undeclared egg, hazelnut and soy",
+      "company_name": "Blueroot Health",
+      "status": "ACTIVE",
+      "affected_area": null,
+      "report_date": "04/10/2026",
+      "recall_initiation_date": "04/10/2026",
+      "url": "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts",
+      "raw": {
+        "date": "04/10/2026",
+        "brand_names": "Vital Nutrient",
+        "product_description": "Aller-C Dietary Supplement",
+        "product_type": "Dietary Supplements",
+        "reason_for_recall": "Undeclared egg, hazelnut and soy",
+        "company_name": "Blueroot Health",
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "source": "FDA-web",
+      "recall_number": null,
+      "brand_name": "Revitaderm, Tridergel",
+      "brand_names": "Revitaderm, Tridergel",
+      "product_description": "Antiseptic wound care gel bottles and tubes",
+      "product_type": "Drugs",
+      "reason_for_recall": "Products were found to contain Lysinibacillus fusiformis, an environmental organism",
+      "company_name": "Blaine Labs, Inc.",
+      "status": "ACTIVE",
+      "affected_area": null,
+      "report_date": "04/08/2026",
+      "recall_initiation_date": "04/08/2026",
+      "url": "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts",
+      "raw": {
+        "date": "04/08/2026",
+        "brand_names": "Revitaderm, Tridergel",
+        "product_description": "Antiseptic wound care gel bottles and tubes",
+        "product_type": "Drugs",
+        "reason_for_recall": "Products were found to contain Lysinibacillus fusiformis, an environmental organism",
+        "company_name": "Blaine Labs, Inc.",
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "source": "FDA-web",
+      "recall_number": null,
+      "brand_name": "DTF Sexual Chocolate",
+      "brand_names": "DTF Sexual Chocolate",
+      "product_description": "Chocolate",
+      "product_type": "Food & Beverages",
+      "reason_for_recall": "Undeclared Sildenafil and Tadalafil",
+      "company_name": "Nalpac",
+      "status": "ACTIVE",
+      "affected_area": null,
+      "report_date": "04/07/2026",
+      "recall_initiation_date": "04/07/2026",
+      "url": "https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts",
+      "raw": {
+        "date": "04/07/2026",
+        "brand_names": "DTF Sexual Chocolate",
+        "product_description": "Chocolate",
+        "product_type": "Food & Beverages",
+        "reason_for_recall": "Undeclared Sildenafil and Tadalafil",
+        "company_name": "Nalpac",
+        "status": "ACTIVE"
+      }
+    }
+  ],
+  "usda": [
+    {
+      "source": "USDA-mirror",
+      "recall_number": null,
+      "brand_name": null,
+      "product_description": "FSIS Issues Public Health Alert for Beef and Pork Products Due to Misbranding and Undeclared Allergen",
+      "product_type": "Food",
+      "reason_for_recall": "WASHINGTON, April 9, 2026 \u2013 The U.S. Department of Agriculture\u2019s Food Safety and Inspection Service (FSIS) is issuing a public health alert for raw beef and pork products due to misbranding and an undeclared allergen. The products may contain sesame, a known allergen, which is...",
+      "company_name": "Sky Ranch Meat LLC",
+      "status": "ACTIVE",
+      "affected_area": null,
+      "report_date": "Thu, 04/09/2026",
+      "recall_initiation_date": "Thu, 04/09/2026",
+      "url": "http://www.fsis.usda.gov/recalls-alerts/fsis-issues-public-health-alert-beef-and-pork-products-due-misbranding-and",
+      "raw": {
+        "title": "FSIS Issues Public Health Alert for Beef and Pork Products Due to Misbranding and Undeclared Allergen",
+        "link": "http://www.fsis.usda.gov/recalls-alerts/fsis-issues-public-health-alert-beef-and-pork-products-due-misbranding-and",
+        "company_name": "Sky Ranch Meat LLC",
+        "status": "ACTIVE",
+        "report_date": "Thu, 04/09/2026",
+        "affected_area": null,
+        "reason_for_recall": "WASHINGTON, April 9, 2026 \u2013 The U.S. Department of Agriculture\u2019s Food Safety and Inspection Service (FSIS) is issuing a public health alert for raw beef and pork products due to misbranding and an undeclared allergen. The products may contain sesame, a known allergen, which is..."
+      }
+    },
+    {
+      "source": "USDA-mirror",
+      "recall_number": null,
+      "brand_name": null,
+      "product_description": "FSIS Issues Public Health Alert for Beef and Pork Products Produced Without the Benefit of Inspection",
+      "product_type": "Food",
+      "reason_for_recall": "Editor\u2019s Note: Mar. 30, 2026 \u2013 The labels in this release were revised to remove unrelated product that was inadvertently included in the background of some photos. WASHINGTON, March 25, 2026 - The U.S. Department of Agriculture's Food Safety and Inspection Service (FSIS) is issuing...",
+      "company_name": null,
+      "status": "ACTIVE",
+      "affected_area": "NATIONWIDE",
+      "report_date": "Wed, 03/25/2026",
+      "recall_initiation_date": "Wed, 03/25/2026",
+      "url": "http://www.fsis.usda.gov/recalls-alerts/fsis-issues-public-health-alert-beef-and-pork-products-produced-without-benefit",
+      "raw": {
+        "title": "FSIS Issues Public Health Alert for Beef and Pork Products Produced Without the Benefit of Inspection",
+        "link": "http://www.fsis.usda.gov/recalls-alerts/fsis-issues-public-health-alert-beef-and-pork-products-produced-without-benefit",
+        "company_name": null,
+        "status": "ACTIVE",
+        "report_date": "Wed, 03/25/2026",
+        "affected_area": "NATIONWIDE",
+        "reason_for_recall": "Editor\u2019s Note: Mar. 30, 2026 \u2013 The labels in this release were revised to remove unrelated product that was inadvertently included in the background of some photos. WASHINGTON, March 25, 2026 - The U.S. Department of Agriculture's Food Safety and Inspection Service (FSIS) is issuing..."
+      }
+    },
+    {
+      "source": "USDA-mirror",
+      "recall_number": null,
+      "brand_name": null,
+      "product_description": "FSIS Issues Public Health Alert For Frozen Ready-To-Eat Turkey Stuffed Pastry Products Due To Misbranding",
+      "product_type": "Food",
+      "reason_for_recall": "WASHINGTON, March 13, 2026 \u2013 The U.S. Department of Agriculture\u2019s Food Safety and Inspection Service (FSIS) is issuing a public health alert for frozen ready-to-eat turkey stuffed pastry products due to misbranding. Some boxes of the turkey, pesto, and cheese stuffed pastries contain ham and...",
+      "company_name": "Shaw Bakers LLC",
+      "status": "ACTIVE",
+      "affected_area": "MIDWEST",
+      "report_date": "Fri, 03/13/2026",
+      "recall_initiation_date": "Fri, 03/13/2026",
+      "url": "http://www.fsis.usda.gov/recalls-alerts/fsis-issues-public-health-alert-frozen-ready-eat-turkey-stuffed-pastry-products-due",
+      "raw": {
+        "title": "FSIS Issues Public Health Alert For Frozen Ready-To-Eat Turkey Stuffed Pastry Products Due To Misbranding",
+        "link": "http://www.fsis.usda.gov/recalls-alerts/fsis-issues-public-health-alert-frozen-ready-eat-turkey-stuffed-pastry-products-due",
+        "company_name": "Shaw Bakers LLC",
+        "status": "ACTIVE",
+        "report_date": "Fri, 03/13/2026",
+        "affected_area": "MIDWEST",
+        "reason_for_recall": "WASHINGTON, March 13, 2026 \u2013 The U.S. Department of Agriculture\u2019s Food Safety and Inspection Service (FSIS) is issuing a public health alert for frozen ready-to-eat turkey stuffed pastry products due to misbranding. Some boxes of the turkey, pesto, and cheese stuffed pastries contain ham and..."
+      }
+    },
+    {
+      "source": "USDA-mirror",
+      "recall_number": null,
+      "brand_name": null,
+      "product_description": "FSIS Issues Public Health Alert for Ready-To-Eat Beef Jerky Products Due to Misbranding and Undeclared Allergen",
+      "product_type": "Food",
+      "reason_for_recall": "WASHINGTON, March 1, 2026 \u2013 The U.S. Department of Agriculture's Food Safety and Inspection Service (FSIS) is issuing a public health alert for beef jerky products due to misbranding and undeclared allergens. The products may contain soy lecithin, a known allergen, which is not declared...",
+      "company_name": "Punahele Jerky Company, Inc.",
+      "status": "ACTIVE",
+      "affected_area": "NATIONWIDE",
+      "report_date": "Sun, 03/01/2026",
+      "recall_initiation_date": "Sun, 03/01/2026",
+      "url": "http://www.fsis.usda.gov/recalls-alerts/fsis-issues-public-health-alert-ready-eat-beef-jerky-products-due-misbranding-and",
+      "raw": {
+        "title": "FSIS Issues Public Health Alert for Ready-To-Eat Beef Jerky Products Due to Misbranding and Undeclared Allergen",
+        "link": "http://www.fsis.usda.gov/recalls-alerts/fsis-issues-public-health-alert-ready-eat-beef-jerky-products-due-misbranding-and",
+        "company_name": "Punahele Jerky Company, Inc.",
+        "status": "ACTIVE",
+        "report_date": "Sun, 03/01/2026",
+        "affected_area": "NATIONWIDE",
+        "reason_for_recall": "WASHINGTON, March 1, 2026 \u2013 The U.S. Department of Agriculture's Food Safety and Inspection Service (FSIS) is issuing a public health alert for beef jerky products due to misbranding and undeclared allergens. The products may contain soy lecithin, a known allergen, which is not declared..."
+      }
+    },
+    {
+      "source": "USDA-mirror",
+      "recall_number": null,
+      "brand_name": null,
+      "product_description": "Ajinomoto Foods North America, Inc. Recalls Chicken Fried Rice Products Due to Possible Foreign Matter Contamination",
+      "product_type": "Food",
+      "reason_for_recall": null,
+      "company_name": "Ajinomoto Foods North America",
+      "status": "ACTIVE",
+      "affected_area": "NATIONWIDE",
+      "report_date": "Thu, 02/19/2026",
+      "recall_initiation_date": "Thu, 02/19/2026",
+      "url": "http://www.fsis.usda.gov/recalls-alerts/ajinomoto-foods-north-america-inc--recalls-chicken-fried-rice-products-due-0",
+      "raw": {
+        "title": "Ajinomoto Foods North America, Inc. Recalls Chicken Fried Rice Products Due to Possible Foreign Matter Contamination",
+        "link": "http://www.fsis.usda.gov/recalls-alerts/ajinomoto-foods-north-america-inc--recalls-chicken-fried-rice-products-due-0",
+        "company_name": "Ajinomoto Foods North America",
+        "status": "ACTIVE",
+        "report_date": "Thu, 02/19/2026",
+        "affected_area": "NATIONWIDE",
+        "reason_for_recall": null
+      }
+    }
+  ]
+}

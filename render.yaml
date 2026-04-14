@@ -1,0 +1,25 @@
+services:
+  # ── Single service: FastAPI backend + React frontend ──────────────────────
+  - type: web
+    name: recallalert-api
+    runtime: python
+    buildCommand: cd web && npm install && npm run build && ls -la dist && test -f dist/index.html && cd .. && pip install -r requirements.txt
+    startCommand: python -m uvicorn src.main_api:app --host 0.0.0.0 --port $PORT
+    plan: starter
+    envVars:
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: STORE_BACKEND
+        value: firebase
+      - key: FIREBASE_CRED_PATH
+        sync: false
+      - key: ENVIRONMENT
+        value: production
+      - key: ALLOW_SEND
+        value: "true"
+      - key: FETCH_INTERVAL_MINUTES
+        value: "60"
+      - key: LOG_LEVEL
+        value: INFO

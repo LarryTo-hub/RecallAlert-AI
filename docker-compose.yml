@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # FastAPI backend
+  api:
+    build: .
+    container_name: recall-alert-api
+    ports:
+      - "8080:8080"
+    environment:
+      ENVIRONMENT: development
+      STORE_BACKEND: sqlite
+      LOG_LEVEL: INFO
+      DATABASE_URL: sqlite:///recalls.db
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      JWT_SECRET_KEY: dev-secret-key-change-in-production
+      PORT: 8080
+      # CORS for local React development
+      ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+    volumes:
+      - .:/app
+      - /app/__pycache__
+    command: python -m uvicorn src.main_api:app --host 0.0.0.0 --port 8080 --reload
+    networks:
+      - recall-network
+
+  # Firebase Emulator (optional, for local Firestore testing)
+  firebase-emulator:
+    image: oterv/firebase-emulator
+    container_name: firebase-emulator
+    ports:
+      - "4000:4000"
+      - "5000:5000"
+      - "8085:8085"
+      - "9000:9000"
+    environment:
+      FIREBASE_DATABASE_EMULATOR_HOST: localhost:9000
+      FIRESTORE_EMULATOR_HOST: localhost:8085
+    networks:
+      - recall-network
+    profiles:
+      - firebase
+
+  # React frontend (assumes it's in ../website or similar)
+  # Uncomment if you want to run frontend here:
+  # web:
+  #   build: ../website
+  #   container_name: recall-alert-web
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     REACT_APP_API_URL: http://localhost:8080
+  #     REACT_APP_WS_URL: ws://localhost:8080
+  #   networks:
+  #     - recall-network
+
+networks:
+  recall-network:
+    driver: bridge

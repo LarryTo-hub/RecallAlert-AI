@@ -1,0 +1,42 @@
+"""Small runner: fetch FDA recalls once and persist any new ones."""
+import logging
+from src.fetcher import fetch_fda_recalls
+from src.store import init_db, save_if_new
+from src.notifier import notify_stub
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("recall-agent")
+
+
+def run_once():
+    init_db()
+    items = fetch_fda_recalls(10)
+    logger.info("Fetched %d items", len(items))
+    new_count = 0
+
+    for it in items:
+        saved = save_if_new(it)
+
+        if saved:
+            new_count += 1
+
+            # Handle both SQLite (SQLModel object) and Firestore (dict)
+            if hasattr(saved, "recall_number"):
+                recall_number = saved.recall_number
+                product_desc = saved.product_description
+            else:
+                recall_number = saved.get("recall_number")
+                product_desc = saved.get("product_description")
+
+            notify_stub(
+                f"Recall: {recall_number or 'N/A'}",
+                product_desc or "",
+                []
+            )
+
+    logger.info("New records saved: %d", new_count)
+
+
+if __name__ == "__main__":
+    run_once()

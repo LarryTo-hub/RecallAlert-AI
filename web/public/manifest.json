@@ -1,0 +1,42 @@
+{
+  "name": "RecallAlert AI",
+  "short_name": "RecallAlert",
+  "description": "AI-powered food recall monitoring — protect your pantry with real-time FDA and USDA alerts.",
+  "theme_color": "#dc2626",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "categories": ["food", "health", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/dashboard",
+      "description": "View latest recalls"
+    },
+    {
+      "name": "My Pantry",
+      "url": "/pantry",
+      "description": "Manage pantry items"
+    }
+  ]
+}
