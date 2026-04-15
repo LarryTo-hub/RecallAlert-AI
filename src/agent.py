@@ -78,26 +78,104 @@ def parse_recall(recall: Dict[str, Any]) -> Dict[str, Any]:
 
 # ── Pantry matching ───────────────────────────────────────────────────────
 
-def match_pantry(parsed_recall: Dict[str, Any],
-                 pantry_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Use Gemini to find which pantry items match a parsed recall.
+# Tokens to ignore during overlap comparisons
+_MATCH_STOPWORDS = {
+    "the", "and", "for", "with", "from", "this", "that", "are", "has",
+    "have", "due", "may", "can", "its", "not", "all", "any", "inc",
+    "llc", "ltd", "corp", "co", "company", "foods", "products", "brand",
+    "item", "items", "units", "pack", "packs", "size", "oz", "lb", "lbs",
+}
 
-    pantry_items: list of dicts with keys product_name, brand, lot_code.
-    Returns list of matched pantry item dicts.
+
+def _tokenize(text: str) -> set:
+    """Lowercase-split a string, strip punctuation, remove stopwords & short tokens."""
+    return {
+        w.lower().strip(".,;:'\"()[]")
+        for w in (text or "").split()
+        if len(w) > 2 and w.lower().strip(".,;:'\"()[]") not in _MATCH_STOPWORDS
+    }
+
+
+def _candidate_filter(
+    parsed_recall: Dict[str, Any],
+    pantry_items: List[Dict[str, Any]],
+) -> List[int]:
+    """Deterministic pre-filter: return 0-based indices of pantry items that share
+    at least one meaningful token with the recall products/brands, have a matching
+    brand name, or share a lot code.  Eliminates obvious misses before calling Gemini.
+    """
+    recall_tokens: set = set()
+    for p in parsed_recall.get("products", []):
+        recall_tokens |= _tokenize(p)
+    for b in parsed_recall.get("brands", []):
+        recall_tokens |= _tokenize(b)
+
+    recall_brands = {b.lower().strip() for b in parsed_recall.get("brands", []) if b}
+    recall_lots = {lc.lower().strip() for lc in parsed_recall.get("lot_codes", []) if lc}
+
+    candidates = []
+    for idx, item in enumerate(pantry_items):
+        item_tokens = _tokenize(item.get("product_name", ""))
+        if item.get("brand"):
+            item_tokens |= _tokenize(item["brand"])
+        item_brand = (item.get("brand") or "").lower().strip()
+        item_lot = (item.get("lot_code") or "").lower().strip()
+
+        if (recall_tokens & item_tokens) or \
+           (item_brand and item_brand in recall_brands) or \
+           (item_lot and item_lot in recall_lots):
+            candidates.append(idx)
+
+    return candidates
+
+
+def match_pantry(
+    parsed_recall: Dict[str, Any],
+    pantry_items: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Two-stage pantry matching: deterministic filter → strict Gemini verifier.
+
+    Stage 1: Token-overlap candidate filter eliminates obvious misses with no LLM cost.
+    Stage 2: Gemini returns structured evidence + confidence for each candidate.
+             Only items with confidence >= 0.6 AND at least one concrete evidence
+             field (matched_brand, matched_lot_code, matched_allergen, or
+             matched_product_tokens) are kept.
     """
     if not pantry_items:
         return []
 
+    # Stage 1 — deterministic pre-filter
+    candidate_indices = _candidate_filter(parsed_recall, pantry_items)
+    if not candidate_indices:
+        return []
+
+    candidates = [pantry_items[i] for i in candidate_indices]
+
     prompt = (
-        "You are a food-safety matching engine. Given a recall and a user's "
-        "pantry list, determine which pantry items are likely affected.\n\n"
-        "Return ONLY a valid JSON array of indices (0-based) of the pantry "
-        "items that match. If none match, return an empty array [].\n\n"
-        "Consider partial name matches, brand matches, and lot code matches. "
-        "Err on the side of caution — if a pantry item COULD be affected, "
-        "include it.\n\n"
+        "You are a strict food-safety verification engine. Your job is to "
+        "confirm or deny whether each candidate pantry item is genuinely "
+        "affected by the given recall.\n\n"
+        "Rules:\n"
+        "- Only confirm a match if there is CONCRETE evidence: same brand, "
+        "same specific product type, matching lot code, or a shared specific allergen.\n"
+        "- Generic overlapping words (e.g., 'rice', 'sauce', 'chicken') alone "
+        "are NOT sufficient — the brand or product line must also align.\n"
+        "- Do NOT err on the side of caution. Reject ambiguous cases.\n"
+        "- Assign a confidence score 0.0–1.0 based on strength of evidence.\n\n"
+        "Return ONLY a valid JSON array. Each element must be:\n"
+        '  { "index": <int, 0-based position in the candidates list>,\n'
+        '    "confidence": <float 0.0-1.0>,\n'
+        '    "matched_brand": <exact matching brand string, or null>,\n'
+        '    "matched_product_tokens": <list of specific shared product tokens>,\n'
+        '    "matched_allergen": <shared allergen string, or null>,\n'
+        '    "matched_lot_code": <matching lot code string, or null>,\n'
+        '    "reason": <one-sentence justification> }\n\n'
+        "Include ONLY entries where confidence >= 0.6 AND at least one of "
+        "matched_brand, matched_lot_code, matched_allergen, or "
+        "matched_product_tokens (non-empty list) is non-null.\n"
+        "If no candidates qualify, return an empty array [].\n\n"
         f"Recall:\n{json.dumps(parsed_recall, default=str, indent=2)}\n\n"
-        f"Pantry items:\n{json.dumps(pantry_items, default=str, indent=2)}"
+        f"Candidate pantry items:\n{json.dumps(candidates, default=str, indent=2)}"
     )
 
     try:
@@ -107,23 +185,38 @@ def match_pantry(parsed_recall: Dict[str, Any],
             text = text.split("\n", 1)[1] if "\n" in text else text[3:]
         if text.endswith("```"):
             text = text[: text.rfind("```")]
-        indices = json.loads(text)
-        return [pantry_items[i] for i in indices if 0 <= i < len(pantry_items)]
-    except Exception:
-        logger.exception("Gemini match_pantry failed; falling back to keyword match")
-        # Simple keyword fallback
-        recall_words = set()
-        for p in parsed_recall.get("products", []):
-            recall_words.update(w.lower() for w in p.split() if len(w) > 2)
-        for b in parsed_recall.get("brands", []):
-            recall_words.update(w.lower() for w in b.split() if len(w) > 2)
-
+        results = json.loads(text)
         matched = []
-        for item in pantry_items:
-            item_words = set(w.lower() for w in item.get("product_name", "").split() if len(w) > 2)
+        for r in results:
+            if not isinstance(r, dict):
+                continue
+            conf = float(r.get("confidence", 0))
+            idx = r.get("index")
+            if not isinstance(idx, int) or not (0 <= idx < len(candidates)):
+                continue
+            has_evidence = (
+                r.get("matched_brand")
+                or r.get("matched_lot_code")
+                or r.get("matched_allergen")
+                or (r.get("matched_product_tokens") or [])
+            )
+            if conf >= 0.6 and has_evidence:
+                matched.append(candidates[idx])
+        return matched
+    except Exception:
+        logger.exception("Gemini match_pantry failed; falling back to deterministic filter")
+        # Deterministic fallback: require >=2 token overlap to avoid single-word false positives
+        recall_tokens: set = set()
+        for p in parsed_recall.get("products", []):
+            recall_tokens |= _tokenize(p)
+        for b in parsed_recall.get("brands", []):
+            recall_tokens |= _tokenize(b)
+        matched = []
+        for item in candidates:
+            item_tokens = _tokenize(item.get("product_name", ""))
             if item.get("brand"):
-                item_words.update(w.lower() for w in item["brand"].split() if len(w) > 2)
-            if recall_words & item_words:
+                item_tokens |= _tokenize(item["brand"])
+            if len(recall_tokens & item_tokens) >= 2:
                 matched.append(item)
         return matched
 
