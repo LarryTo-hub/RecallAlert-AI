@@ -44,19 +44,25 @@ def parse_recall(recall: Dict[str, Any]) -> Dict[str, Any]:
 
     Returns dict with: products, brands, severity, lot_codes, reason_summary
     """
+    # Pre-strip ingredient lists from product_description so Gemini
+    # cannot accidentally extract ingredient words as product names.
+    raw_desc = recall.get("product_description") or ""
+    clean_desc = _extract_product_name(raw_desc)
+    clean_recall = {**recall, "product_description": clean_desc}
+
     prompt = (
         "You are a food-safety analyst. Given the following recall record, "
         "extract structured information. Return ONLY a valid JSON object with "
         "these keys:\n"
-        '  "products": list of SHORT commercial product name strings — extract ONLY the product name (e.g., '
-        '"Junebar Peanut Chocolate Chip All Natural Snack Bar"), NOT the ingredient list, UPC codes, '
-        'allergen statements, or supplementary text. Stop at the first occurrence of \'INGREDIENTS:\', '
-        '\'UPC\', \'Net Wt\', \'ALLERGEN\', or a semicolon followed by ingredient content.\n'
+        '  "products": list of SHORT commercial product name strings — the brand '
+        'and product name ONLY (e.g., "Junebar Peanut Chocolate Chip All Natural '
+        'Snack Bar"). Do NOT include ingredients, allergen warnings, UPC codes, '
+        'net weight, or any supplementary text as separate product entries.\n'
         '  "brands": list of brand name strings,\n'
         '  "severity": "high" | "medium" | "low",\n'
         '  "lot_codes": list of lot/batch code strings (empty list if none),\n'
         '  "reason_summary": one-sentence plain-English summary of the recall reason\n\n'
-        f"Recall record:\n{json.dumps(recall, default=str, indent=2)}"
+        f"Recall record:\n{json.dumps(clean_recall, default=str, indent=2)}"
     )
 
     try:
@@ -71,7 +77,8 @@ def parse_recall(recall: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:
         logger.exception("Gemini parse_recall failed; returning fallback")
         return {
-            "products": [recall.get("product_description", "")],
+            # Use the CLEAN description (no ingredient list) in the fallback
+            "products": [clean_desc] if clean_desc else [],
             "brands": [b for b in [recall.get("brand_name")] if b],
             "severity": "medium",
             "lot_codes": [],
@@ -152,9 +159,9 @@ def _candidate_filter(
         item_brand = (item.get("brand") or "").lower().strip()
         item_lot = (item.get("lot_code") or "").lower().strip()
 
-        # For single-token pantry items (e.g. GARLIC, POTATOES) require a brand
-        # match or lot code match — a lone generic word overlapping a product name
-        # is not enough to be a candidate.
+        # Single-token pantry items (bare ingredient names) require a brand or
+        # lot match — a lone generic word overlapping a product name is not
+        # sufficient to be a candidate.
         item_is_single_word = len(item_tokens) == 1
         token_overlap = recall_tokens & item_tokens
         brand_match = item_brand and item_brand in recall_brands
@@ -162,9 +169,20 @@ def _candidate_filter(
 
         if lot_match or brand_match:
             candidates.append(idx)
-        elif token_overlap and not item_is_single_word:
-            candidates.append(idx)
-        elif token_overlap and item_is_single_word and brand_match:
+            continue
+
+        if not token_overlap:
+            continue
+
+        # Require ≥60% of the pantry item's tokens to match across the recall
+        # product name. A pantry item that shares only one incidental word with
+        # a longer recall name is not a reliable candidate.
+        item_coverage = len(token_overlap) / len(item_tokens) if item_tokens else 0.0
+
+        if item_is_single_word:
+            # Single-word items need a brand or lot match (handled above).
+            pass
+        elif item_coverage >= 0.6:
             candidates.append(idx)
 
     return candidates
@@ -200,20 +218,14 @@ def match_pantry(
         "A pantry item matches ONLY if the user's pantry item IS the actual recalled "
         "product (or a specific branded variant of it). Reject all other cases.\n\n"
         "REJECT these common false positive patterns:\n"
-        "  - A raw/generic ingredient (GARLIC, POTATOES, EGGS, MILK, SESAME SEED, "
-        "SOY SAUCE, ONION, SALT) does NOT match a recall of a product that merely "
-        "CONTAINS or is FLAVORED WITH that ingredient.\n"
-        "    e.g. GARLIC ≠ 'Garlic Dill Pickles' (pickles contain garlic)\n"
-        "    e.g. GARLIC ≠ 'Garlic Flavor Roasted Peanuts' (peanuts flavored with garlic)\n"
-        "    e.g. GARLIC ≠ 'Garlic & Herb Cream Cheese' (cream cheese flavored with garlic)\n"
-        "    e.g. GARLIC ≠ 'Garlic Salt' (seasoning, not raw garlic)\n"
-        "    e.g. POTATOES ≠ 'Tater Tots shaped potatoes' (processed frozen product)\n"
-        "    e.g. POTATOES ≠ 'Breakfast Burrito with Potatoes' (burrito that contains potatoes)\n"
-        "    e.g. SOY SAUCE ≠ 'Fried Rice with Sweet Soy Sauce' (rice dish containing soy sauce)\n"
-        "    e.g. SESAME SEED ≠ 'Hamburger Bun with undeclared sesame' (the bun is recalled, not sesame seeds)\n"
-        "  - A generic pantry ingredient only matches a recall if the recalled product "
-        "IS primarily that ingredient (e.g., branded fresh garlic, a garlic supplement, "
-        "a specific brand of frozen potatoes the user owns).\n\n"
+        "  - A raw/generic ingredient does NOT match a recall of a manufactured product "
+        "that merely CONTAINS, is FLAVORED WITH, or is NAMED AFTER that ingredient.\n"
+        "    e.g. EGGS ≠ a product that contains eggs as an ingredient\n"
+        "    e.g. MILK ≠ a dairy product made with milk\n"
+        "    e.g. FLOUR ≠ a baked good that lists flour as an ingredient\n"
+        "  - A generic ingredient only matches if the recalled product IS that ingredient "
+        "as a standalone item — for example a specific branded package of that ingredient, "
+        "or a supplement form of it.\n\n"
         "ACCEPT only when:\n"
         "- The pantry item and the recalled product are the same type of product AND "
         "share the same brand, OR\n"

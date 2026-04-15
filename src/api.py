@@ -496,37 +496,58 @@ async def match_pantry(user_id: str = Query("")):
         candidates = get_all_recalls(skip=0, limit=300)
 
     def deterministic_match(recall: dict, pantry_items: List[dict]) -> List[dict]:
-        """Fallback matcher using direct text containment / token overlap."""
-        text = " ".join(
-            [
-                str(recall.get("product_description") or ""),
-                str(recall.get("brand_name") or ""),
-                str(recall.get("reason_for_recall") or ""),
-                str(recall.get("company_name") or ""),
-            ]
-        ).lower()
+        """Fallback matcher for obvious product-name matches missed by the LLM.
+
+        Intentionally conservative: uses only the stripped product name (not
+        the ingredient list) and skips single-word generic items that have no
+        brand, so it cannot re-introduce ingredient-based false positives.
+        """
+        from src.agent import _extract_product_name, _tokenize
+
+        # Build a clean search text from structural fields only — NO ingredient lists.
+        clean_desc = _extract_product_name(str(recall.get("product_description") or ""))
+        brand_name = str(recall.get("brand_name") or "")
+        clean_text = (clean_desc + " " + brand_name).lower()
 
         matched_items = []
         for item in pantry_items:
-            name = str(item.get("product_name") or "").strip().lower()
-            brand = str(item.get("brand") or "").strip().lower()
+            name = str(item.get("product_name") or "").strip()
+            item_brand = str(item.get("brand") or "").strip().lower()
             if not name:
                 continue
 
-            # Strong signal: full pantry product string appears in recall text.
-            if name in text:
+            item_tokens = _tokenize(name)
+
+            # Skip single-word generic pantry items with no brand — they must
+            # pass the LLM stage; the fallback cannot safely distinguish a bare
+            # ingredient name from a product named after that ingredient.
+            if len(item_tokens) <= 1 and not item_brand:
+                continue
+
+            name_lower = name.lower()
+            recall_tokens = _tokenize(clean_text)
+
+            # Coverage ratio: the pantry item's overlapping tokens must account
+            # for ≥40% of the recall's product-name tokens. A pantry item that
+            # shares only one or two incidental words with a longer product name
+            # is not a reliable match.
+            MIN_RECALL_COVERAGE = 0.40
+            overlap = len(item_tokens & recall_tokens)
+            coverage = overlap / len(recall_tokens) if recall_tokens else 0.0
+
+            # Strong signal: full pantry product string in clean recall text,
+            # AND the item covers a meaningful share of that text.
+            if name_lower in clean_text and coverage >= MIN_RECALL_COVERAGE:
                 matched_items.append(item)
                 continue
 
-            # Secondary signal: at least 2 overlapping significant tokens.
-            item_tokens = {t for t in name.split() if len(t) > 2}
-            recall_tokens = {t for t in text.split() if len(t) > 2}
-            if len(item_tokens & recall_tokens) >= 2:
+            # Secondary signal: ≥2 overlapping tokens with sufficient coverage.
+            if overlap >= 2 and coverage >= MIN_RECALL_COVERAGE:
                 matched_items.append(item)
                 continue
 
-            # Brand-only match if user provided brand.
-            if brand and brand in text:
+            # Brand-only signal.
+            if item_brand and item_brand in clean_text:
                 matched_items.append(item)
 
         return matched_items
@@ -647,31 +668,35 @@ async def submit_feedback(alert_id: int, feedback: AlertFeedback, user_id: str =
             parsed = parse_recall(recall)
             matched = agent_match_pantry(parsed, pantry_dicts)
 
-            # Guardrail deterministic fallback for obvious text matches.
+            # Guardrail deterministic fallback — use ingredient-stripped text
+            # and skip single-word items to avoid re-introducing false positives.
             if not matched:
-                text = " ".join(
-                    [
-                        str(recall.get("product_description") or ""),
-                        str(recall.get("brand_name") or ""),
-                        str(recall.get("reason_for_recall") or ""),
-                        str(recall.get("company_name") or ""),
-                    ]
-                ).lower()
+                from src.agent import _extract_product_name, _tokenize
+                clean_desc = _extract_product_name(str(recall.get("product_description") or ""))
+                brand_name = str(recall.get("brand_name") or "")
+                clean_text = (clean_desc + " " + brand_name).lower()
+                MIN_RECALL_COVERAGE = 0.40
                 matched = []
                 for item in pantry_dicts:
-                    name = str(item.get("product_name") or "").strip().lower()
-                    brand = str(item.get("brand") or "").strip().lower()
+                    name = str(item.get("product_name") or "").strip()
+                    item_brand = str(item.get("brand") or "").strip().lower()
                     if not name:
                         continue
-                    if name in text:
+                    item_tokens = _tokenize(name)
+                    # Same single-word and coverage guards as the /match fallback.
+                    if len(item_tokens) <= 1 and not item_brand:
+                        continue
+                    name_lower = name.lower()
+                    recall_tokens = _tokenize(clean_text)
+                    overlap = len(item_tokens & recall_tokens)
+                    coverage = overlap / len(recall_tokens) if recall_tokens else 0.0
+                    if name_lower in clean_text and coverage >= MIN_RECALL_COVERAGE:
                         matched.append(item)
                         continue
-                    item_tokens = {t for t in name.split() if len(t) > 2}
-                    recall_tokens = {t for t in text.split() if len(t) > 2}
-                    if len(item_tokens & recall_tokens) >= 2:
+                    if overlap >= 2 and coverage >= MIN_RECALL_COVERAGE:
                         matched.append(item)
                         continue
-                    if brand and brand in text:
+                    if item_brand and item_brand in clean_text:
                         matched.append(item)
 
             for item in matched:
