@@ -559,6 +559,24 @@ async def match_pantry(user_id: str = Query("")):
             }
         )
 
+    # Send email if user has one registered and there are matches
+    if matches and user.email:
+        try:
+            from src.notifier import send_email_smtp
+            matched_products = ", ".join(
+                m["product_name"] for match in matches for m in match["matched_items"]
+            )
+            subject = f"[RecallAlert] {len(matches)} recall(s) matched your pantry"
+            body = f"The following pantry items matched active recalls:\n\n{matched_products}\n\n"
+            for m in matches:
+                recall = m["recall"]
+                body += f"• {recall.get('product_description', 'Unknown')} — {recall.get('reason_for_recall', 'N/A')}\n"
+            body += "\nCheck the RecallAlert app for full details."
+            send_email_smtp(subject, body, user.email)
+            logger.info("Sent match email to %s", user.email)
+        except Exception:
+            logger.exception("Failed to send match email to %s", user.email)
+
     return {"matches": matches}
 
 

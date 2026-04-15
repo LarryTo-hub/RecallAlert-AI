@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   saveNotificationSettings,
@@ -45,14 +45,15 @@ export default function Notifications() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  useQuery({
+  const { data: emailData } = useQuery({
     queryKey: ["emailSettings"],
     queryFn: getEmailSettings,
-    onSuccess: (data: { email: string; notify_new_only: boolean }) => {
-      if (data.email) setEmail(data.email);
-      setNotifyNewOnly(data.notify_new_only);
-    },
-  } as any);
+  });
+
+  useEffect(() => {
+    if (emailData?.email) setEmail(emailData.email);
+    if (emailData?.notify_new_only !== undefined) setNotifyNewOnly(emailData.notify_new_only);
+  }, [emailData]);
 
   const saveMutation = useMutation({
     mutationFn: () =>
