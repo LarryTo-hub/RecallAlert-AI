@@ -48,7 +48,10 @@ def parse_recall(recall: Dict[str, Any]) -> Dict[str, Any]:
         "You are a food-safety analyst. Given the following recall record, "
         "extract structured information. Return ONLY a valid JSON object with "
         "these keys:\n"
-        '  "products": list of product name strings,\n'
+        '  "products": list of SHORT commercial product name strings — extract ONLY the product name (e.g., '
+        '"Junebar Peanut Chocolate Chip All Natural Snack Bar"), NOT the ingredient list, UPC codes, '
+        'allergen statements, or supplementary text. Stop at the first occurrence of \'INGREDIENTS:\', '
+        '\'UPC\', \'Net Wt\', \'ALLERGEN\', or a semicolon followed by ingredient content.\n'
         '  "brands": list of brand name strings,\n'
         '  "severity": "high" | "medium" | "low",\n'
         '  "lot_codes": list of lot/batch code strings (empty list if none),\n'
@@ -96,6 +99,32 @@ def _tokenize(text: str) -> set:
     }
 
 
+_INGREDIENT_MARKERS = (
+    "INGREDIENTS:", "Ingredients:", "ingredients:",
+    "; INGREDIENTS", "; Ingredients",
+    "CONTAINS LESS THAN", "Contains less than",
+    "; UPC", " UPC:", "UPC ", "UPC-",
+    " Net Wt", " NET WT", " Net wt", " NET WEIGHT", " Net Weight",
+    "SHELF LIFE", "Shelf Life",
+    "Manufacturer:", "MANUFACTURER",
+    "KEEP REFRIGERATED", "Keep Refrigerated", "KEEP FROZEN", "Keep Frozen",
+    "ALLERGEN WARNING", "Allergen Warning", "ALLERGY WARNING",
+    # Marketing description separators — product name ends before these
+    " - A Chinese", " - A Japanese", " - A ",
+    ". Net Wt", ". Net wt",
+)
+
+
+def _extract_product_name(text: str) -> str:
+    """Strip ingredient lists and supplementary info, returning only the primary product name."""
+    result = text
+    for marker in _INGREDIENT_MARKERS:
+        idx = result.find(marker)
+        if 0 < idx < len(result):
+            result = result[:idx]
+    return result.strip(" ;,")
+
+
 def _candidate_filter(
     parsed_recall: Dict[str, Any],
     pantry_items: List[Dict[str, Any]],
@@ -104,9 +133,10 @@ def _candidate_filter(
     at least one meaningful token with the recall products/brands, have a matching
     brand name, or share a lot code.  Eliminates obvious misses before calling Gemini.
     """
+    # Use only the primary product name portion — strip ingredient lists before tokenizing
     recall_tokens: set = set()
     for p in parsed_recall.get("products", []):
-        recall_tokens |= _tokenize(p)
+        recall_tokens |= _tokenize(_extract_product_name(p))
     for b in parsed_recall.get("brands", []):
         recall_tokens |= _tokenize(b)
 
@@ -115,15 +145,26 @@ def _candidate_filter(
 
     candidates = []
     for idx, item in enumerate(pantry_items):
-        item_tokens = _tokenize(item.get("product_name", ""))
+        item_name = item.get("product_name", "")
+        item_tokens = _tokenize(item_name)
         if item.get("brand"):
             item_tokens |= _tokenize(item["brand"])
         item_brand = (item.get("brand") or "").lower().strip()
         item_lot = (item.get("lot_code") or "").lower().strip()
 
-        if (recall_tokens & item_tokens) or \
-           (item_brand and item_brand in recall_brands) or \
-           (item_lot and item_lot in recall_lots):
+        # For single-token pantry items (e.g. GARLIC, POTATOES) require a brand
+        # match or lot code match — a lone generic word overlapping a product name
+        # is not enough to be a candidate.
+        item_is_single_word = len(item_tokens) == 1
+        token_overlap = recall_tokens & item_tokens
+        brand_match = item_brand and item_brand in recall_brands
+        lot_match = item_lot and item_lot in recall_lots
+
+        if lot_match or brand_match:
+            candidates.append(idx)
+        elif token_overlap and not item_is_single_word:
+            candidates.append(idx)
+        elif token_overlap and item_is_single_word and brand_match:
             candidates.append(idx)
 
     return candidates
@@ -155,23 +196,29 @@ def match_pantry(
         "You are a strict food-safety verification engine. Your job is to "
         "confirm or deny whether each candidate pantry item is genuinely "
         "affected by the given recall.\n\n"
-        "CRITICAL RULE — ingredient vs. product distinction:\n"
-        "A pantry item ONLY matches if the recalled product IS that item "
-        "(or an exact branded variant of it). Do NOT match if the pantry item "
-        "is merely an ingredient listed inside the recalled product.\n"
-        "Examples of INCORRECT matches you must reject:\n"
-        "  - GARLIC does not match a hummus recall that contains garlic.\n"
-        "  - SOY SAUCE does not match a fried rice recall that contains soy sauce.\n"
-        "  - SESAME SEED does not match a burger bun recalled for undeclared sesame.\n"
-        "  - MILK does not match a pizza crust recalled for undeclared milk allergen.\n"
-        "  - EGGS does not match any product that merely lists eggs as an ingredient.\n\n"
-        "Additional rules:\n"
-        "- Only confirm a match if there is CONCRETE evidence: same brand AND "
-        "same specific product type, matching lot code, or a shared allergen "
-        "where the pantry item itself IS the allergen-containing recalled product.\n"
-        "- Overlapping words alone are NEVER sufficient — the pantry item must "
-        "be the actual recalled product, not just share a word with it.\n"
-        "- Do NOT err on the side of caution. When in doubt, reject.\n"
+        "CRITICAL RULE — the pantry item must BE the recalled product:\n"
+        "A pantry item matches ONLY if the user's pantry item IS the actual recalled "
+        "product (or a specific branded variant of it). Reject all other cases.\n\n"
+        "REJECT these common false positive patterns:\n"
+        "  - A raw/generic ingredient (GARLIC, POTATOES, EGGS, MILK, SESAME SEED, "
+        "SOY SAUCE, ONION, SALT) does NOT match a recall of a product that merely "
+        "CONTAINS or is FLAVORED WITH that ingredient.\n"
+        "    e.g. GARLIC ≠ 'Garlic Dill Pickles' (pickles contain garlic)\n"
+        "    e.g. GARLIC ≠ 'Garlic Flavor Roasted Peanuts' (peanuts flavored with garlic)\n"
+        "    e.g. GARLIC ≠ 'Garlic & Herb Cream Cheese' (cream cheese flavored with garlic)\n"
+        "    e.g. GARLIC ≠ 'Garlic Salt' (seasoning, not raw garlic)\n"
+        "    e.g. POTATOES ≠ 'Tater Tots shaped potatoes' (processed frozen product)\n"
+        "    e.g. POTATOES ≠ 'Breakfast Burrito with Potatoes' (burrito that contains potatoes)\n"
+        "    e.g. SOY SAUCE ≠ 'Fried Rice with Sweet Soy Sauce' (rice dish containing soy sauce)\n"
+        "    e.g. SESAME SEED ≠ 'Hamburger Bun with undeclared sesame' (the bun is recalled, not sesame seeds)\n"
+        "  - A generic pantry ingredient only matches a recall if the recalled product "
+        "IS primarily that ingredient (e.g., branded fresh garlic, a garlic supplement, "
+        "a specific brand of frozen potatoes the user owns).\n\n"
+        "ACCEPT only when:\n"
+        "- The pantry item and the recalled product are the same type of product AND "
+        "share the same brand, OR\n"
+        "- The lot code matches exactly, OR\n"
+        "- The pantry item is a specific branded product clearly described by the recall\n\n"
         "- Assign a confidence score 0.0–1.0 based on strength of evidence.\n\n"
         "Return ONLY a valid JSON array. Each element must be:\n"
         '  { "index": <int, 0-based position in the candidates list>,\n'
