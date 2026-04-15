@@ -325,33 +325,33 @@ Fetches the latest 5 FDA + USDA recalls and saves them to `demo/recalls_demo.jso
 │  FDA/USDA APIs                                                  │
 │      │                                                          │
 │      ▼                                                          │
-│  ┌─────────────────┐                                           │
-│  │ Fetcher Module  │─── Multiple sources, fallback logic      │
-│  └────────┬────────┘                                           │
-│           │                                                    │
-│           ▼                                                    │
-│  ┌──────────────────────┐                                     │
-│  │ Store (SQLite)       │─── Deduplication, persistence      │
-│  └────────┬─────────────┘                                     │
-│           │                                                   │
-│           ▼                                                   │
-│  ┌──────────────────────┐                                     │
-│  │ Gemini Agent         │─── Parse, Match, Generate alerts    │
-│  └────────┬─────────────┘                                     │
-│           │                                                   │
-│           ▼                                                   │
-│  ┌──────────────────────┐     ┌─────────────────────────┐    │
-│  │ Poll Results         │────▶│ WebSocket Broadcasting  │    │
-│  │ (New Alerts)         │     │ (Real-time to clients)  │    │
-│  └──────────────────────┘     └──────────┬──────────────┘    │
-│                                          │                   │
-│                                          ▼                   │
-│                               ┌──────────────────┐            │
-│                               │ React Dashboard  │            │
-│                               │ (User Interface) │            │
-│                               └──────────────────┘            │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+│  ┌─────────────────┐                                            │
+│  │ Fetcher Module  │─── Multiple sources, fallback logic        │
+│  └────────┬────────┘                                            │
+│           │                                                     │
+│           ▼                                                     │
+│  ┌──────────────────────┐                                       │
+│  │ Store (SQLite)       │─── Deduplication, persistence         │
+│  └────────┬─────────────┘                                       │
+│           │                                                     │
+│           ▼                                                     │
+│  ┌──────────────────────┐                                       │
+│  │ Gemini Agent         │─── Parse, Match, Generate alerts      │
+│  └────────┬─────────────┘                                       │
+│           │                                                     │
+│           ▼                                                     │
+│  ┌──────────────────────┐     ┌─────────────────────────┐       │
+│  │ Poll Results         │────▶│ WebSocket Broadcasting  │       
+│  │ (New Alerts)         │     │ (Real-time to clients)  │       │
+│  └──────────────────────┘     └──────────┬──────────────┘       │
+│                                          │                      │
+│                                          ▼                      │ 
+│                               ┌──────────────────┐              │
+│                               │ React Dashboard  │              │
+│                               │ (User Interface) │              │
+│                               └──────────────────┘              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────
 ```
 
 ## Troubleshooting
@@ -381,7 +381,7 @@ Pull requests welcome! Please:
 
 ## License
 
-MIT License — see LICENSE file for details
+No license
 
 ## Support
 
@@ -392,7 +392,7 @@ MIT License — see LICENSE file for details
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `GOOGLE_API_KEY` | Yes | Google Gemini API key |
-| `DATABASE_URL` | No | Database URL (default: `sqlite:///recalls.db`) |
+| `DATABASE_URL` | No | Database URL (default: `sqlite:///recalls.db`) |l
 | `FETCH_INTERVAL_MINUTES` | No | Polling interval (default: `60`) |
 | `LOG_LEVEL` | No | Logging level (default: `INFO`) |
 
