@@ -12,7 +12,7 @@ import Settings from "@/pages/Settings";
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="flex h-screen overflow-hidden bg-gray-50">
+      <div className="flex h-screen overflow-hidden bg-navy-900">
         {/* Sidebar nav — visible on md+ */}
         <NavBar variant="sidebar" />
 

@@ -92,16 +92,16 @@ export default function Pantry() {
     <div className="max-w-2xl mx-auto px-4 py-6">
       {/* Toast */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 bg-success text-white text-sm px-4 py-2.5 rounded-lg shadow-lg">
+        <div className="fixed top-4 right-4 z-50 bg-emerald-600 text-white text-sm px-4 py-2.5 rounded-lg shadow-lg">
           {toast}
         </div>
       )}
 
-      <h1 className="text-xl font-bold text-gray-900 mb-5">My Pantry</h1>
+      <h1 className="text-xl font-bold text-white mb-5">My Pantry</h1>
 
       {/* Add item form */}
-      <section className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-        <h2 className="font-semibold text-sm text-gray-700 mb-3">Add Item Manually</h2>
+      <section className="bg-navy-800 rounded-xl border border-navy-700 p-4 mb-4">
+        <h2 className="font-semibold text-sm text-slate-300 mb-3">Add Item Manually</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -119,7 +119,7 @@ export default function Pantry() {
             placeholder="Product name *"
             value={form.product_name}
             onChange={(e) => setForm((f) => ({ ...f, product_name: e.target.value }))}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="border border-navy-700 bg-navy-900 text-white placeholder-slate-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             aria-label="Product name"
           />
           <div className="flex gap-2">
@@ -127,14 +127,14 @@ export default function Pantry() {
               placeholder="Brand (optional)"
               value={form.brand}
               onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))}
-              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="flex-1 border border-navy-700 bg-navy-900 text-white placeholder-slate-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
               aria-label="Brand"
             />
             <input
               placeholder="Lot code (optional)"
               value={form.lot_code}
               onChange={(e) => setForm((f) => ({ ...f, lot_code: e.target.value }))}
-              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="flex-1 border border-navy-700 bg-navy-900 text-white placeholder-slate-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
               aria-label="Lot code"
             />
           </div>
@@ -149,10 +149,10 @@ export default function Pantry() {
       </section>
 
       {/* OCR upload */}
-      <section className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-        <h2 className="font-semibold text-sm text-gray-700 mb-3">Scan Receipt</h2>
+      <section className="bg-navy-800 rounded-xl border border-navy-700 p-4 mb-4">
+        <h2 className="font-semibold text-sm text-slate-300 mb-3">Scan Receipt</h2>
         <div
-          className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-primary/40 transition-colors"
+          className="border-2 border-dashed border-navy-700 rounded-xl p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
           onClick={() => fileRef.current?.click()}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
@@ -166,9 +166,14 @@ export default function Pantry() {
           {ocrPreview ? (
             <img src={ocrPreview} alt="Receipt preview" className="max-h-32 mx-auto rounded-lg mb-2 object-contain" />
           ) : (
-            <span className="text-4xl block mb-2" aria-hidden="true">📷</span>
+            <div className="w-12 h-12 mx-auto mb-3 text-slate-500">
+              <svg fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+              </svg>
+            </div>
           )}
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-slate-400">
             {ocrMutation.isPending ? "Scanning receipt…" : "Tap to upload or drag & drop a receipt photo"}
           </p>
         </div>
@@ -188,7 +193,7 @@ export default function Pantry() {
         {/* OCR confirmation list */}
         {ocrItems.length > 0 && (
           <div className="mt-3">
-            <p className="text-xs text-gray-500 mb-2">Review extracted items:</p>
+            <p className="text-xs text-slate-500 mb-2">Review extracted items:</p>
             <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
               {ocrItems.map((item, i) => (
                 <label key={i} className="flex items-center gap-2 text-sm cursor-pointer">
@@ -200,11 +205,11 @@ export default function Pantry() {
                         prev.map((it, j) => j === i ? { ...it, checked: e.target.checked } : it)
                       )
                     }
-                    className="rounded"
+                    className="rounded accent-primary"
                   />
-                  <span className="font-medium">{item.product_name}</span>
-                  {item.brand && <span className="text-gray-400">· {item.brand}</span>}
-                  {item.lot_code && <span className="text-gray-400 text-xs">Lot: {item.lot_code}</span>}
+                  <span className="font-medium text-white">{item.product_name}</span>
+                  {item.brand && <span className="text-slate-400">· {item.brand}</span>}
+                  {item.lot_code && <span className="text-slate-500 text-xs">Lot: {item.lot_code}</span>}
                 </label>
               ))}
             </div>
@@ -224,25 +229,24 @@ export default function Pantry() {
         <button
           onClick={() => matchMutation.mutate()}
           disabled={matchMutation.isPending || items.length === 0}
-          className="flex-1 flex items-center justify-center gap-1.5 bg-orange-500 text-white text-sm font-medium rounded-lg py-2.5 hover:bg-orange-600 transition-colors disabled:opacity-60"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-primary text-white text-sm font-medium rounded-lg py-2.5 hover:bg-primary-dark transition-colors disabled:opacity-60"
         >
-          <span aria-hidden="true">🔍</span>
           {matchMutation.isPending ? "Checking…" : "Check Against Recalls"}
         </button>
         <a
           href={pantryExportUrl()}
           download="pantry.csv"
-          className="px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          className="px-3 py-2.5 bg-navy-800 border border-navy-700 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-navy-700 transition-colors"
           aria-label="Export pantry as CSV"
         >
-          ⬇ CSV
+          Export CSV
         </a>
         <button
           onClick={() => {
             if (confirm(`Clear all ${items.length} pantry items?`)) clearMutation.mutate();
           }}
           disabled={items.length === 0}
-          className="px-3 py-2.5 bg-white border border-red-200 text-red-500 rounded-lg text-sm hover:bg-red-50 transition-colors disabled:opacity-40"
+          className="px-3 py-2.5 bg-navy-800 border border-red-900/50 text-red-400 rounded-lg text-sm hover:bg-red-900/20 transition-colors disabled:opacity-40"
           aria-label="Clear pantry"
         >
           Clear
@@ -251,20 +255,20 @@ export default function Pantry() {
 
       {/* Match results */}
       {matches !== null && (
-        <section className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4">
-          <h2 className="font-semibold text-sm text-orange-800 mb-2">
-            {matches.length === 0 ? "✅ No matches found — your pantry looks safe!" : `⚠️ ${matches.length} potential match(es) found`}
+        <section className="bg-navy-800 border border-navy-700 rounded-xl p-4 mb-4">
+          <h2 className="font-semibold text-sm text-slate-300 mb-2">
+            {matches.length === 0 ? "No matches found — your pantry looks safe." : `${matches.length} potential match(es) found`}
           </h2>
           {matches.map((m, i) => (
-            <div key={i} className="bg-white rounded-lg border border-orange-100 p-3 mb-2">
+            <div key={i} className="bg-navy-900 rounded-lg border border-navy-700 p-3 mb-2">
               <div className="flex items-center gap-2 mb-1">
                 <SeverityBadge severity={m.parsed.severity} />
-                <span className="text-sm font-medium text-gray-800 line-clamp-1">
+                <span className="text-sm font-medium text-white line-clamp-1">
                   {m.recall.product_description}
                 </span>
               </div>
-              <p className="text-xs text-gray-500 mb-1">{m.parsed.reason_summary}</p>
-              <p className="text-xs text-orange-700">
+              <p className="text-xs text-slate-400 mb-1">{m.parsed.reason_summary}</p>
+              <p className="text-xs text-primary-light">
                 Your items: {m.matched_items.map((it) => it.product_name).join(", ")}
               </p>
             </div>
@@ -274,27 +278,25 @@ export default function Pantry() {
 
       {/* Pantry list */}
       <section>
-        <h2 className="font-semibold text-sm text-gray-700 mb-2">
+        <h2 className="font-semibold text-sm text-slate-300 mb-2">
           Items ({items.length})
         </h2>
         {isLoading ? (
-          <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+          <div className="bg-navy-800 rounded-xl border border-navy-700 divide-y divide-navy-700">
             {Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)}
           </div>
         ) : items.length === 0 ? (
-          <p className="text-center text-gray-400 text-sm py-8">
+          <p className="text-center text-slate-500 text-sm py-8">
             No items yet. Add products manually or scan a receipt.
           </p>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+          <div className="bg-navy-800 rounded-xl border border-navy-700 divide-y divide-navy-700">
             {items.map((item) => (
               <div key={item.id} className="flex items-center gap-3 px-4 py-3">
-                <span className="text-lg" aria-hidden="true">
-                  {item.source === "receipt" ? "🧾" : "✏️"}
-                </span>
+                <div className="w-2 h-2 rounded-full bg-primary/60 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{item.product_name}</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-sm font-medium text-white truncate">{item.product_name}</p>
+                  <p className="text-xs text-slate-500">
                     {[item.brand, item.lot_code ? `Lot: ${item.lot_code}` : null]
                       .filter(Boolean)
                       .join(" · ") || "No brand/lot"}
@@ -302,7 +304,7 @@ export default function Pantry() {
                 </div>
                 <button
                   onClick={() => deleteMutation.mutate(item.id)}
-                  className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                  className="p-1.5 text-slate-600 hover:text-red-400 transition-colors rounded-lg hover:bg-red-900/20"
                   aria-label={`Remove ${item.product_name}`}
                 >
                   ✕

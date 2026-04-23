@@ -9,12 +9,18 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    @apply bg-navy-900 text-white antialiased;
   }
 }
 
 @layer utilities {
   .safe-pb {
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .card {
+    @apply bg-navy-800 border border-navy-700 rounded-xl;
+  }
+  .card-hover {
+    @apply bg-navy-800 border border-navy-700 rounded-xl hover:border-navy-600 transition-colors;
   }
 }

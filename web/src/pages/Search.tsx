@@ -26,7 +26,7 @@ export default function Search() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      <h1 className="text-xl font-bold text-gray-900 mb-4">Search Recalls</h1>
+      <h1 className="text-xl font-bold text-white mb-4">Search Recalls</h1>
 
       {/* Search input */}
       <form
@@ -41,7 +41,7 @@ export default function Search() {
           placeholder="Search product, brand, company, reason…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="flex-1 border border-navy-700 bg-navy-800 text-white placeholder-slate-500 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
           aria-label="Search recalls"
         />
         <button
@@ -49,7 +49,7 @@ export default function Search() {
           className="bg-primary text-white px-4 rounded-xl font-medium text-sm hover:bg-primary-dark transition-colors"
           aria-label="Search"
         >
-          🔍
+          Search
         </button>
       </form>
 
@@ -58,7 +58,7 @@ export default function Search() {
         <select
           value={source}
           onChange={(e) => { setSource(e.target.value); setCommitted(query.trim()); }}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="border border-navy-700 bg-navy-800 text-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
           aria-label="Filter by source"
         >
           <option value="">All sources</option>
@@ -69,7 +69,7 @@ export default function Search() {
         <select
           value={status}
           onChange={(e) => { setStatus(e.target.value); setCommitted(query.trim()); }}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="border border-navy-700 bg-navy-800 text-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
           aria-label="Filter by status"
         >
           <option value="">All statuses</option>
@@ -86,7 +86,7 @@ export default function Search() {
               setSource("");
               setStatus("");
             }}
-            className="px-3 py-2 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-3 py-2 text-xs text-slate-400 border border-navy-700 bg-navy-800 rounded-lg hover:bg-navy-700 hover:text-white transition-colors"
           >
             Clear filters
           </button>
@@ -99,17 +99,16 @@ export default function Search() {
           {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : !committed && !source && !status ? (
-        <div className="text-center py-16 text-gray-400">
-          <p className="text-4xl mb-3" aria-hidden="true">🔍</p>
+        <div className="text-center py-16 text-slate-500">
           <p className="text-sm">Enter a search term to find recalls</p>
         </div>
       ) : recalls.length === 0 ? (
-        <div className="text-center py-12 text-gray-400 text-sm">
+        <div className="text-center py-12 text-slate-500 text-sm">
           No results found for "{committed}".
         </div>
       ) : (
         <>
-          <p className="text-xs text-gray-500 mb-3">{recalls.length} result(s)</p>
+          <p className="text-xs text-slate-500 mb-3">{recalls.length} result(s)</p>
           <div className="flex flex-col gap-3">
             {recalls.map((r, i) => (
               <RecallCard key={`${r.recall_number ?? i}-${r.source}`} recall={r} index={i} />

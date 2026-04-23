@@ -4,16 +4,16 @@ interface Props {
 }
 
 const map: Record<string, { label: string; cls: string }> = {
-  high: { label: "HIGH", cls: "bg-red-100 text-red-700 border-red-200" },
-  medium: { label: "MEDIUM", cls: "bg-orange-100 text-orange-700 border-orange-200" },
-  low: { label: "LOW", cls: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+  high: { label: "HIGH", cls: "bg-red-900/40 text-red-400 border-red-700/50" },
+  medium: { label: "MEDIUM", cls: "bg-amber-900/40 text-amber-400 border-amber-700/50" },
+  low: { label: "LOW", cls: "bg-yellow-900/30 text-yellow-400 border-yellow-700/40" },
 };
 
 export default function SeverityBadge({ severity, className = "" }: Props) {
   const key = (severity ?? "").toLowerCase();
   const { label, cls } = map[key] ?? {
     label: "UNKNOWN",
-    cls: "bg-gray-100 text-gray-600 border-gray-200",
+    cls: "bg-navy-700 text-slate-400 border-navy-600",
   };
 
   return (

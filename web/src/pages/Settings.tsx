@@ -45,38 +45,38 @@ export default function Settings() {
     <div className="max-w-lg mx-auto px-4 py-6">
       {toast && (
         <div className={`fixed top-4 right-4 z-50 text-white text-sm px-4 py-2.5 rounded-lg shadow-lg
-          ${toast.ok ? "bg-success" : "bg-primary"}`}>
+          ${toast.ok ? "bg-emerald-600" : "bg-primary"}`}>
           {toast.msg}
         </div>
       )}
 
-      <h1 className="text-xl font-bold text-gray-900 mb-5">Settings</h1>
+      <h1 className="text-xl font-bold text-white mb-5">Settings</h1>
 
       {/* Status card */}
-      <section className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
-        <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <span aria-hidden="true">📊</span> System Status
+      <section className="bg-navy-800 rounded-xl border border-navy-700 p-5 mb-4">
+        <h2 className="font-semibold text-white mb-3">
+          System Status
         </h2>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-500">Recalls cached</span>
-            <span className="font-medium text-gray-800">{stats?.total_recalls ?? "—"}</span>
+            <span className="text-slate-400">Recalls cached</span>
+            <span className="font-medium text-white">{stats?.total_recalls ?? "—"}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">Active recalls</span>
-            <span className="font-medium text-red-600">{stats?.active_recalls ?? "—"}</span>
+            <span className="text-slate-400">Active recalls</span>
+            <span className="font-medium text-red-400">{stats?.active_recalls ?? "—"}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">Last updated</span>
-            <span className="font-medium text-gray-600 text-xs">
+            <span className="text-slate-400">Last updated</span>
+            <span className="font-medium text-slate-300 text-xs">
               {stats?.cache_updated_at
                 ? new Date(stats.cache_updated_at).toLocaleString()
                 : "Never"}
             </span>
           </div>
-          <div className="flex justify-between items-center pt-1 border-t border-gray-100 mt-2">
-            <span className="text-gray-500">Gemini AI</span>
-            <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+          <div className="flex justify-between items-center pt-1 border-t border-navy-700 mt-2">
+            <span className="text-slate-400">Gemini AI</span>
+            <span className="text-xs font-medium text-emerald-400 bg-emerald-900/40 px-2 py-0.5 rounded-full">
               gemini-2.0-flash
             </span>
           </div>
@@ -84,11 +84,11 @@ export default function Settings() {
       </section>
 
       {/* Manual fetch */}
-      <section className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
-        <h2 className="font-semibold text-gray-800 mb-1 flex items-center gap-2">
-          <span aria-hidden="true">🔄</span> Manual Fetch
+      <section className="bg-navy-800 rounded-xl border border-navy-700 p-5 mb-4">
+        <h2 className="font-semibold text-white mb-1">
+          Manual Fetch
         </h2>
-        <p className="text-xs text-gray-500 mb-3">
+        <p className="text-xs text-slate-400 mb-3">
           Immediately fetch the latest FDA and USDA recalls and update the cache.
         </p>
         <button
@@ -96,16 +96,16 @@ export default function Settings() {
           disabled={fetchMutation.isPending}
           className="w-full bg-primary text-white font-medium rounded-lg py-2.5 text-sm hover:bg-primary-dark transition-colors disabled:opacity-60"
         >
-          {fetchMutation.isPending ? "⏳ Fetching…" : "🔄 Fetch Recalls Now"}
+          {fetchMutation.isPending ? "Fetching…" : "Fetch Recalls Now"}
         </button>
       </section>
 
       {/* Polling interval */}
-      <section className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
-        <h2 className="font-semibold text-gray-800 mb-1 flex items-center gap-2">
-          <span aria-hidden="true">⏱</span> Polling Interval
+      <section className="bg-navy-800 rounded-xl border border-navy-700 p-5 mb-4">
+        <h2 className="font-semibold text-white mb-1">
+          Polling Interval
         </h2>
-        <p className="text-xs text-gray-500 mb-3">
+        <p className="text-xs text-slate-400 mb-3">
           Set FETCH_INTERVAL_MINUTES in your .env / Render environment variables to change the server-side interval.
           This preference is saved locally.
         </p>
@@ -123,48 +123,46 @@ export default function Settings() {
                 }}
                 className="accent-primary"
               />
-              <span className="text-sm text-gray-700">{i.label}</span>
+              <span className="text-sm text-slate-300">{i.label}</span>
             </label>
           ))}
         </div>
       </section>
 
       {/* Database backend */}
-      <section className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
-        <h2 className="font-semibold text-gray-800 mb-1 flex items-center gap-2">
-          <span aria-hidden="true">🗄</span> Storage Backend
+      <section className="bg-navy-800 rounded-xl border border-navy-700 p-5 mb-4">
+        <h2 className="font-semibold text-white mb-1">
+          Storage Backend
         </h2>
-        <p className="text-xs text-gray-500 mb-2">
-          Configure via <code className="bg-gray-100 px-1 rounded">STORE_BACKEND</code> env var:
+        <p className="text-xs text-slate-400 mb-2">
+          Configure via <code className="bg-navy-700 text-primary-light px-1 rounded">STORE_BACKEND</code> env var:
         </p>
         <div className="flex flex-col gap-2 text-sm">
-          <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-            <span aria-hidden="true">💾</span>
+          <div className="flex items-center gap-3 p-3 bg-navy-900 rounded-lg border border-navy-700">
             <div>
-              <p className="font-medium text-gray-800">SQLite (default)</p>
-              <p className="text-xs text-gray-500">Set <code className="bg-gray-100 px-1 rounded">STORE_BACKEND=sqlite</code></p>
+              <p className="font-medium text-white">SQLite (default)</p>
+              <p className="text-xs text-slate-400">Set <code className="bg-navy-700 text-primary-light px-1 rounded">STORE_BACKEND=sqlite</code></p>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-            <span aria-hidden="true">🔥</span>
+          <div className="flex items-center gap-3 p-3 bg-navy-900 rounded-lg border border-navy-700">
             <div>
-              <p className="font-medium text-gray-800">Firebase / Firestore</p>
-              <p className="text-xs text-gray-500">Set <code className="bg-gray-100 px-1 rounded">STORE_BACKEND=firebase</code> + <code className="bg-gray-100 px-1 rounded">FIREBASE_CRED_PATH</code></p>
+              <p className="font-medium text-white">Firebase / Firestore</p>
+              <p className="text-xs text-slate-400">Set <code className="bg-navy-700 text-primary-light px-1 rounded">STORE_BACKEND=firebase</code> + <code className="bg-navy-700 text-primary-light px-1 rounded">FIREBASE_CRED_PATH</code></p>
             </div>
           </div>
         </div>
       </section>
 
       {/* About */}
-      <section className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <span aria-hidden="true">ℹ️</span> About
+      <section className="bg-navy-800 rounded-xl border border-navy-700 p-5">
+        <h2 className="font-semibold text-white mb-3">
+          About
         </h2>
-        <div className="space-y-1 text-xs text-gray-500">
+        <div className="space-y-1 text-xs text-slate-400">
           <p>RecallAlert AI — version 1.0.0</p>
           <p>Powered by Google Gemini 2.0 Flash</p>
           <p>Data sources: FDA, USDA FSIS</p>
-          <p className="pt-1 text-gray-400">
+          <p className="pt-1 text-slate-500">
             Recall data is provided for informational purposes. Always check official FDA/USDA websites for authoritative recall information.
           </p>
         </div>
