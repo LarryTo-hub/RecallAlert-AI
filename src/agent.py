@@ -180,8 +180,12 @@ def _candidate_filter(
         item_coverage = len(token_overlap) / len(item_tokens) if item_tokens else 0.0
 
         if item_is_single_word:
-            # Single-word items need a brand or lot match (handled above).
-            pass
+            # Single-word items: allow through if the token is a recognized brand
+            # in this recall (e.g. user typed "ReadyMeals" as their pantry item).
+            # Truly generic single words like "Turkey" won't appear in recall_brands,
+            # so they stay blocked and won't cause false positives.
+            if item_tokens & recall_brands:
+                candidates.append(idx)
         elif item_coverage >= 0.6:
             candidates.append(idx)
 
@@ -277,6 +281,7 @@ def match_pantry(
         logger.exception("Gemini match_pantry failed; falling back to deterministic filter")
         # Deterministic fallback: require >=2 token overlap to avoid single-word false positives
         recall_tokens: set = set()
+        recall_brands: set = {b.lower().strip() for b in parsed_recall.get("brands", []) if b}
         for p in parsed_recall.get("products", []):
             recall_tokens |= _tokenize(p)
         for b in parsed_recall.get("brands", []):
@@ -286,7 +291,13 @@ def match_pantry(
             item_tokens = _tokenize(item.get("product_name", ""))
             if item.get("brand"):
                 item_tokens |= _tokenize(item["brand"])
-            if len(recall_tokens & item_tokens) >= 2:
+            item_brand = (item.get("brand") or "").lower().strip()
+            # Single-word pantry entries pass if they match a recall brand.
+            # Multi-word entries require >=2 token overlap to avoid incidental matches.
+            if len(item_tokens) == 1:
+                if item_tokens & recall_brands:
+                    matched.append(item)
+            elif len(recall_tokens & item_tokens) >= 2:
                 matched.append(item)
         return matched
 
