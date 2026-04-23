@@ -2,7 +2,7 @@
 
 const BASE =
   import.meta.env.VITE_API_URL ??
-  (window.location.hostname === "localhost" ? "http://localhost:8080" : "");
+  (window.location.hostname === "localhost" ? "http://localhost:8000" : "");
 
 /** Returns a persistent anonymous user ID (UUID) stored in localStorage. */
 export function getUserId(): string {

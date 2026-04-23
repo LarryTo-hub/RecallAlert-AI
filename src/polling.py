@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from src.fetcher import fetch_fda_recalls, fetch_usda_recalls
+from src.fetcher import fetch_fda_recalls, fetch_usda_recalls, iter_fda_recalls_pages
 from src.store import init_db, save_if_new, get_recall_count
 from src.models import (
     init_models_db,
@@ -39,25 +39,103 @@ async def broadcast_alert(user_id: int, alert_message: dict):
         logger.exception("Failed to broadcast alert to user %d: %s", user_id, e)
 
 
+async def _full_historical_usda_fetch() -> None:
+    """Fetch all USDA records, saving to DB. Runs concurrently with FDA fetch."""
+    import asyncio
+    import functools
+
+    loop = asyncio.get_event_loop()
+    logger.info("Historical USDA fetch started…")
+    try:
+        usda_items = await loop.run_in_executor(None, functools.partial(fetch_usda_recalls, limit=None))
+        for item in usda_items:
+            save_if_new(item)
+        logger.info("Historical USDA fetch complete — %d USDA recalls saved, %d total in DB", len(usda_items), get_recall_count())
+    except Exception as exc:
+        logger.warning("Historical USDA fetch failed: %s", exc)
+
+
+async def _full_historical_fetch() -> None:
+    """Fetch all FDA + USDA records back to 2014, saving to DB page-by-page.
+
+    Runs in the background after the initial seed so the website has data
+    immediately while the full history loads progressively.
+    FDA and USDA are fetched concurrently so USDA doesn't wait for FDA to finish.
+    """
+    import asyncio
+    import functools
+
+    loop = asyncio.get_event_loop()
+    logger.info("Full historical fetch started — FDA + USDA running concurrently…")
+
+    # Launch USDA concurrently so it doesn't wait for all FDA pages to complete
+    usda_task = asyncio.create_task(_full_historical_usda_fetch())
+
+    # FDA: iterate page-by-page via the generator so records are saved
+    # progressively and the website shows data after the very first page.
+    gen = iter_fda_recalls_pages()
+    page_num = 0
+
+    def _next_page(g):
+        try:
+            return next(g)
+        except StopIteration:
+            return None
+
+    while True:
+        try:
+            page = await loop.run_in_executor(None, _next_page, gen)
+        except Exception as exc:
+            logger.warning("Historical fetch page error: %s", exc)
+            break
+        if page is None:
+            break
+        for item in page:
+            save_if_new(item)
+        page_num += 1
+        if page_num % 10 == 0:
+            logger.info("Historical fetch: %d pages processed (%d total recalls in DB)", page_num, get_recall_count())
+
+    logger.info("Full historical FDA fetch complete — %d recalls in DB", get_recall_count())
+    await usda_task
+
+
 async def poll_and_alert() -> None:
     """One polling cycle: fetch recalls, match pantries, send alerts via WebSocket."""
+    import asyncio
+    import functools
+
     logger.info("Polling for new recalls…")
 
     init_db()
     init_models_db()
 
-    # On the very first run the store is empty: seed it with the full historical
-    # record set so all 50+ pages of FDA records are captured.  On subsequent
-    # runs only the most-recent batch is fetched; the deduplication in
-    # save_if_new() ensures nothing is processed twice.
+    loop = asyncio.get_event_loop()
+
+    # On the very first run the store is empty: immediately seed with the most
+    # recent 200 FDA records so the website has data right away, then launch
+    # a background task to fetch all historical records (back to 2014) page by
+    # page.  On subsequent runs only a recent batch is fetched.
+    # All blocking HTTP fetches run in a thread pool so the event loop stays free.
     store_count = get_recall_count()
     if store_count == 0:
-        logger.info("Empty store detected — performing full historical fetch (this may take a moment)…")
-        fda_items = fetch_fda_recalls(limit=None)   # all available records
-        usda_items = fetch_usda_recalls(limit=None)
+        logger.info("Empty store — seeding with recent records so the website loads immediately…")
+        # Fetch recent FDA and USDA concurrently for fast initial seed
+        recent_fda_task = loop.run_in_executor(None, functools.partial(fetch_fda_recalls, limit=200))
+        recent_usda_task = loop.run_in_executor(None, functools.partial(fetch_usda_recalls, limit=50))
+        recent_fda, recent_usda = await asyncio.gather(recent_fda_task, recent_usda_task)
+        for item in recent_fda:
+            save_if_new(item)
+        for item in recent_usda:
+            save_if_new(item)
+        logger.info("Seeded %d FDA + %d USDA recalls — launching full historical fetch in background…", len(recent_fda), len(recent_usda))
+        # Full historical fetch (2014→now) runs in the background — no awaiting
+        asyncio.create_task(_full_historical_fetch())
+        fda_items = recent_fda
+        usda_items = recent_usda
     else:
-        fda_items = fetch_fda_recalls(limit=200)    # recent batch for incremental updates
-        usda_items = fetch_usda_recalls(limit=None)  # always full USDA crawl; dedup handles repeats
+        fda_items = await loop.run_in_executor(None, functools.partial(fetch_fda_recalls, limit=200))
+        usda_items = await loop.run_in_executor(None, functools.partial(fetch_usda_recalls, limit=50))
 
     all_items = fda_items + usda_items
     logger.info("Fetched %d FDA + %d USDA recalls", len(fda_items), len(usda_items))

@@ -486,6 +486,63 @@ def _fetch_fda_recalls_from_enforcement(
     return combined
 
 
+def iter_fda_recalls_pages(sort_field: str = "report_date"):
+    """Generator that yields one page (list of dicts) of FDA enforcement records at a time.
+
+    Allows callers to save records to the DB progressively page-by-page
+    instead of waiting for all pages to be fetched first.
+    """
+    for category, endpoint in FDA_ENFORCEMENT_ENDPOINTS.items():
+        skip = 0
+        while True:
+            params = {
+                "limit": _ENFORCEMENT_PAGE_SIZE,
+                "skip": skip,
+                "sort": f"{sort_field}:desc",
+            }
+            try:
+                resp = requests.get(endpoint, params=params, timeout=(5, 20))
+                resp.raise_for_status()
+                data = resp.json()
+            except requests.RequestException:
+                break
+
+            results = data.get("results", [])
+            if not results:
+                break
+
+            page_records = []
+            for item in results:
+                openfda = item.get("openfda") or {}
+                brand_names = openfda.get("brand_name") or []
+                page_records.append(
+                    {
+                        "source": f"FDA-{category}",
+                        "recall_number": item.get("recall_number"),
+                        "brand_name": ", ".join(brand_names) if isinstance(brand_names, list) else str(brand_names or ""),
+                        "product_description": item.get("product_description"),
+                        "product_type": item.get("product_type") or category.title(),
+                        "reason_for_recall": item.get("reason_for_recall"),
+                        "company_name": item.get("company_name") or item.get("recalling_firm"),
+                        "status": _normalize_status(item.get("status") or item.get("recall_status")),
+                        "affected_area": item.get("distribution_pattern"),
+                        "report_date": _normalize_date(item.get("report_date")),
+                        "recall_initiation_date": _normalize_date(item.get("recall_initiation_date")),
+                        "url": None,
+                        "raw": item,
+                    }
+                )
+
+            yield page_records
+
+            meta = data.get("meta", {}).get("results", {})
+            total = meta.get("total", 0)
+            skip += len(results)
+
+            if skip >= total or skip >= _ENFORCEMENT_MAX_SKIP:
+                break
+
+
 def fetch_fda_recalls(limit: int | None = None, sort_field: str = "report_date") -> List[Dict]:
     """Fetch FDA recalls with optional full pagination.
 
