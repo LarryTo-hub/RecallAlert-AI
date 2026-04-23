@@ -940,7 +940,53 @@ async def save_notification_settings(
     body: dict,
     user_id: str = Query("")
 ):
-    """Save user's notification preferences to localStorage-compatible response."""
-    # Preferences (language, threshold, sources) are stored client-side;
-    # this endpoint is a no-op acknowledgement so the frontend call succeeds.
+    """Save user's notification preferences."""
+    from src.models import get_session
+    from sqlmodel import select
+
+    with get_session() as session:
+        user = session.exec(
+            select(User).where(User.user_key == user_id)
+        ).first()
+
+        if not user:
+            user = User(
+                user_key=user_id,
+                language=body.get("language", "en"),
+                severity_threshold=body.get("severity_threshold", "all"),
+                sources=body.get("sources", "both"),
+            )
+            session.add(user)
+        else:
+            user.language = body.get("language", user.language or "en")
+            user.severity_threshold = body.get(
+                "severity_threshold",
+                getattr(user, "severity_threshold", "all"),
+            )
+            user.sources = body.get(
+                "sources",
+                getattr(user, "sources", "both"),
+            )
+
+        session.commit()
+
     return {"status": "saved"}
+
+
+class NotificationSettingsResponse(BaseModel):
+    language: str
+    severity_threshold: str
+    sources: str
+
+
+@app.get("/notifications/settings", response_model=NotificationSettingsResponse)
+async def get_notification_settings(user_id: str = Query("")):
+    from src.models import get_or_create_user_by_key
+
+    user = get_or_create_user_by_key(user_id)
+
+    return NotificationSettingsResponse(
+        language=user.language or "en",
+        severity_threshold=getattr(user, "severity_threshold", "all"),
+        sources=getattr(user, "sources", "both"),
+    )

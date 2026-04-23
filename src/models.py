@@ -26,6 +26,8 @@ class User(SQLModel, table=True):
     email: Optional[str] = Field(default=None, index=True)
     notify_new_only: bool = Field(default=True)
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    severity_threshold: str = "all"
+    sources: str = "both"
 
 
 class PantryItem(SQLModel, table=True):
@@ -219,3 +221,4 @@ def get_alerts(user_id: int, limit: int = 50) -> list[Alert]:
 def get_all_users() -> list[User]:
     with get_session() as sess:
         return list(sess.exec(select(User)).all())
+
