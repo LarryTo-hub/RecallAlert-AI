@@ -6,9 +6,11 @@ import {
 } from "@/api/client";
 import SeverityBadge from "@/components/SeverityBadge";
 import { SkeletonRow } from "@/components/Skeleton";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 export default function Pantry() {
   const qc = useQueryClient();
+  const { t } = useTranslation();
   const [form, setForm] = useState({ product_name: "", brand: "", lot_code: "" });
   const [ocrItems, setOcrItems] = useState<(OcrItem & { checked: boolean })[]>([]);
   const [ocrPreview, setOcrPreview] = useState<string | null>(null);
@@ -32,7 +34,7 @@ export default function Pantry() {
       qc.invalidateQueries({ queryKey: ["pantry"] });
       qc.invalidateQueries({ queryKey: ["stats"] });
       setForm({ product_name: "", brand: "", lot_code: "" });
-      showToast("Item added to pantry");
+      showToast(t("pantry.itemAdded"));
     },
   });
 
@@ -49,7 +51,7 @@ export default function Pantry() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["pantry"] });
       qc.invalidateQueries({ queryKey: ["stats"] });
-      showToast("Pantry cleared");
+      showToast(t("pantry.pantryCleared"));
     },
   });
 
@@ -58,13 +60,13 @@ export default function Pantry() {
     onSuccess: ({ items }) => {
       setOcrItems(items.map((i) => ({ ...i, checked: true })));
     },
-    onError: (e: Error) => showToast(`OCR failed: ${e.message}`),
+    onError: (e: Error) => showToast(t("pantry.ocrFailed", { msg: e.message })),
   });
 
   const matchMutation = useMutation({
     mutationFn: matchPantry,
     onSuccess: ({ matches: m }) => setMatches(m),
-    onError: (e: Error) => showToast(`Match failed: ${e.message}`),
+    onError: (e: Error) => showToast(t("pantry.matchFailed", { msg: e.message })),
   });
 
   const handleOcrFile = (file: File) => {
@@ -83,7 +85,7 @@ export default function Pantry() {
     }
     setOcrItems([]);
     setOcrPreview(null);
-    showToast(`Added ${selected.length} items from receipt`);
+    showToast(t("pantry.addedFromReceipt", { n: String(selected.length) }));
   };
 
   const items = data?.items ?? [];
@@ -97,11 +99,11 @@ export default function Pantry() {
         </div>
       )}
 
-      <h1 className="text-xl font-bold text-white mb-5">My Pantry</h1>
+      <h1 className="text-xl font-bold text-white mb-5">{t("pantry.title")}</h1>
 
       {/* Add item form */}
       <section className="bg-navy-800 rounded-xl border border-navy-700 p-4 mb-4">
-        <h2 className="font-semibold text-sm text-slate-300 mb-3">Add Item Manually</h2>
+        <h2 className="font-semibold text-sm text-slate-300 mb-3">{t("pantry.addManually")}</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -116,7 +118,7 @@ export default function Pantry() {
         >
           <input
             required
-            placeholder="Product name *"
+            placeholder={t("pantry.productName")}
             value={form.product_name}
             onChange={(e) => setForm((f) => ({ ...f, product_name: e.target.value }))}
             className="border border-navy-700 bg-navy-900 text-white placeholder-slate-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
@@ -124,14 +126,14 @@ export default function Pantry() {
           />
           <div className="flex gap-2">
             <input
-              placeholder="Brand (optional)"
+              placeholder={t("pantry.brand")}
               value={form.brand}
               onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))}
               className="flex-1 border border-navy-700 bg-navy-900 text-white placeholder-slate-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
               aria-label="Brand"
             />
             <input
-              placeholder="Lot code (optional)"
+              placeholder={t("pantry.lotCode")}
               value={form.lot_code}
               onChange={(e) => setForm((f) => ({ ...f, lot_code: e.target.value }))}
               className="flex-1 border border-navy-700 bg-navy-900 text-white placeholder-slate-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
@@ -143,14 +145,14 @@ export default function Pantry() {
             disabled={addMutation.isPending}
             className="bg-primary text-white text-sm font-medium rounded-lg py-2 hover:bg-primary-dark transition-colors disabled:opacity-60"
           >
-            {addMutation.isPending ? "Adding…" : "Add to Pantry"}
+            {addMutation.isPending ? t("pantry.adding") : t("pantry.addToPantry")}
           </button>
         </form>
       </section>
 
       {/* OCR upload */}
       <section className="bg-navy-800 rounded-xl border border-navy-700 p-4 mb-4">
-        <h2 className="font-semibold text-sm text-slate-300 mb-3">Scan Receipt</h2>
+        <h2 className="font-semibold text-sm text-slate-300 mb-3">{t("pantry.scanReceipt")}</h2>
         <div
           className="border-2 border-dashed border-navy-700 rounded-xl p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
           onClick={() => fileRef.current?.click()}
@@ -174,7 +176,7 @@ export default function Pantry() {
             </div>
           )}
           <p className="text-sm text-slate-400">
-            {ocrMutation.isPending ? "Scanning receipt…" : "Tap to upload or drag & drop a receipt photo"}
+            {ocrMutation.isPending ? t("pantry.scanningReceipt") : t("pantry.uploadHint")}
           </p>
         </div>
         <input
@@ -231,25 +233,25 @@ export default function Pantry() {
           disabled={matchMutation.isPending || items.length === 0}
           className="flex-1 flex items-center justify-center gap-1.5 bg-primary text-white text-sm font-medium rounded-lg py-2.5 hover:bg-primary-dark transition-colors disabled:opacity-60"
         >
-          {matchMutation.isPending ? "Checking…" : "Check Against Recalls"}
+          {matchMutation.isPending ? t("pantry.checking") : t("pantry.checkRecalls")}
         </button>
         <a
           href={pantryExportUrl()}
           download="pantry.csv"
           className="px-3 py-2.5 bg-navy-800 border border-navy-700 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-navy-700 transition-colors"
-          aria-label="Export pantry as CSV"
+          aria-label={t("pantry.exportCsv")}
         >
-          Export CSV
+          {t("pantry.exportCsv")}
         </a>
         <button
           onClick={() => {
-            if (confirm(`Clear all ${items.length} pantry items?`)) clearMutation.mutate();
+            if (confirm(t("pantry.clearConfirm", { n: String(items.length) }))) clearMutation.mutate();
           }}
           disabled={items.length === 0}
           className="px-3 py-2.5 bg-navy-800 border border-red-900/50 text-red-400 rounded-lg text-sm hover:bg-red-900/20 transition-colors disabled:opacity-40"
-          aria-label="Clear pantry"
+          aria-label={t("pantry.clear")}
         >
-          Clear
+          {t("pantry.clear")}
         </button>
       </div>
 
@@ -257,7 +259,9 @@ export default function Pantry() {
       {matches !== null && (
         <section className="bg-navy-800 border border-navy-700 rounded-xl p-4 mb-4">
           <h2 className="font-semibold text-sm text-slate-300 mb-2">
-            {matches.length === 0 ? "No matches found — your pantry looks safe." : `${matches.length} potential match(es) found`}
+            {matches.length === 0
+              ? t("pantry.noMatchFound")
+              : t("pantry.matchesFound", { n: String(matches.length) })}
           </h2>
           {matches.map((m, i) => (
             <div key={i} className="bg-navy-900 rounded-lg border border-navy-700 p-3 mb-2">
@@ -269,7 +273,7 @@ export default function Pantry() {
               </div>
               <p className="text-xs text-slate-400 mb-1">{m.parsed.reason_summary}</p>
               <p className="text-xs text-primary-light">
-                Your items: {m.matched_items.map((it) => it.product_name).join(", ")}
+                {t("pantry.yourItems")}: {m.matched_items.map((it) => it.product_name).join(", ")}
               </p>
             </div>
           ))}
@@ -279,7 +283,7 @@ export default function Pantry() {
       {/* Pantry list */}
       <section>
         <h2 className="font-semibold text-sm text-slate-300 mb-2">
-          Items ({items.length})
+          {t("pantry.itemsCount", { n: String(items.length) })}
         </h2>
         {isLoading ? (
           <div className="bg-navy-800 rounded-xl border border-navy-700 divide-y divide-navy-700">
@@ -287,7 +291,7 @@ export default function Pantry() {
           </div>
         ) : items.length === 0 ? (
           <p className="text-center text-slate-500 text-sm py-8">
-            No items yet. Add products manually or scan a receipt.
+            {t("pantry.noItems")}
           </p>
         ) : (
           <div className="bg-navy-800 rounded-xl border border-navy-700 divide-y divide-navy-700">

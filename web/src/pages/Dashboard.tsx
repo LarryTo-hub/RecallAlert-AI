@@ -4,26 +4,29 @@ import { useNavigate } from "react-router-dom";
 import { fetchRecalls, fetchStats, triggerFetch } from "@/api/client";
 import RecallCard from "@/components/RecallCard";
 import { SkeletonCard } from "@/components/Skeleton";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 const SOURCES = ["All", "FDA", "USDA"];
-const STATUSES: Array<{ label: string; value: string }> = [
-  { label: "All", value: "All" },
-  { label: "Active", value: "ACTIVE" },
-  { label: "Inactive", value: "INACTIVE" },
-];
-const SORTS: Array<{ value: "latest" | "oldest"; label: string }> = [
-  { value: "latest", label: "Newest first" },
-  { value: "oldest", label: "Oldest first" },
-];
 
 export default function Dashboard() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [source, setSource] = useState("All");
   const [status, setStatus] = useState("All");
   const [sort, setSort] = useState<"latest" | "oldest">("latest");
   const [offset, setOffset] = useState(0);
   const LIMIT = 20;
+
+  const STATUSES = [
+    { label: t("dash.statusAll"), value: "All" },
+    { label: t("dash.statusActive"), value: "ACTIVE" },
+    { label: t("dash.statusInactive"), value: "INACTIVE" },
+  ];
+  const SORTS = [
+    { value: "latest" as const, label: t("dash.newestFirst") },
+    { value: "oldest" as const, label: t("dash.oldestFirst") },
+  ];
 
   const params = {
     limit: LIMIT,
@@ -56,10 +59,10 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-bold text-white">Recall Feed</h1>
+          <h1 className="text-xl font-bold text-white">{t("dash.title")}</h1>
           {data?.updated_at && (
             <p className="text-xs text-slate-500 mt-0.5">
-              Updated {new Date(data.updated_at).toLocaleString()}
+              {t("dash.updated", { date: new Date(data.updated_at).toLocaleString() })}
             </p>
           )}
         </div>
@@ -67,9 +70,9 @@ export default function Dashboard() {
           onClick={() => refresh.mutate()}
           disabled={refresh.isPending}
           className="flex items-center gap-1.5 text-sm bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-60 font-medium"
-          aria-label="Refresh recalls"
+          aria-label={t("dash.refresh")}
         >
-          {refresh.isPending ? "Refreshing…" : "Refresh"}
+          {refresh.isPending ? t("dash.refreshing") : t("dash.refresh")}
         </button>
       </div>
 
@@ -77,9 +80,9 @@ export default function Dashboard() {
       {stats && (
         <div className="grid grid-cols-3 gap-3 mb-5">
           {[
-            { label: "Total Recalls", value: stats.total_recalls, color: "text-white" },
-            { label: "Active", value: stats.active_recalls, color: "text-red-400" },
-            { label: "My Pantry", value: stats.pantry_items, color: "text-primary-light" },
+            { label: t("dash.totalRecalls"), value: stats.total_recalls, color: "text-white" },
+            { label: t("dash.active"), value: stats.active_recalls, color: "text-red-400" },
+            { label: t("dash.myPantry"), value: stats.pantry_items, color: "text-primary-light" },
           ].map((s) => (
             <div key={s.label} className="bg-navy-800 rounded-xl border border-navy-700 p-3 text-center">
               <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -134,13 +137,13 @@ export default function Dashboard() {
         onClick={() => navigate("/pantry")}
         className="w-full mb-5 flex items-center justify-center gap-2 bg-primary/10 border border-primary/30 text-primary-light font-medium rounded-xl py-3 text-sm hover:bg-primary/15 transition-colors"
       >
-        Check My Pantry Against These Recalls
+        {t("dash.checkPantry")}
       </button>
 
       {/* Recall list */}
       {isError && (
         <div className="text-center py-12 text-red-400">
-          Failed to load recalls. Make sure the API server is running.
+          {t("dash.loadFailed")}
         </div>
       )}
 
@@ -149,7 +152,7 @@ export default function Dashboard() {
           {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : recalls.length === 0 ? (
-        <div className="text-center py-12 text-slate-500">No recalls found for these filters.</div>
+        <div className="text-center py-12 text-slate-500">{t("dash.noResults")}</div>
       ) : (
         <>
           <div className="flex flex-col gap-3">
@@ -165,7 +168,7 @@ export default function Dashboard() {
               disabled={offset === 0}
               className="px-3 py-1.5 border border-navy-700 rounded-lg hover:bg-navy-800 hover:text-white transition-colors disabled:opacity-40"
             >
-              ← Prev
+              {t("dash.prev")}
             </button>
             <span>
               {offset + 1}–{Math.min(offset + recalls.length, total)} of {total}
@@ -175,7 +178,7 @@ export default function Dashboard() {
               disabled={offset + LIMIT >= total}
               className="px-3 py-1.5 border border-navy-700 rounded-lg hover:bg-navy-800 hover:text-white transition-colors disabled:opacity-40"
             >
-              Next →
+              {t("dash.next")}
             </button>
           </div>
         </>

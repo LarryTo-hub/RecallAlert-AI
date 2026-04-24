@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { sendChatMessage } from "@/api/client";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 interface Message {
   role: "user" | "bot";
@@ -11,12 +12,12 @@ async function sendChat(message: string): Promise<string> {
   return data.reply;
 }
 
-const WELCOME: Message = {
-  role: "bot",
-  text: "Hi! I'm RecallAlert AI. Ask me about food recalls, disposal instructions, or whether your pantry items are affected.",
-};
-
 export default function ChatBot() {
+  const { t } = useTranslation();
+  const WELCOME: Message = {
+    role: "bot",
+    text: t("chat.welcome"),
+  };
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
   const [input, setInput] = useState("");
@@ -47,7 +48,7 @@ export default function ChatBot() {
       const msg = err instanceof Error ? err.message : "Something went wrong";
       setMessages((prev) => [
         ...prev,
-        { role: "bot", text: `Sorry, I couldn't respond right now: ${msg}` },
+        { role: "bot", text: t("chat.errorPrefix", { error: msg }) },
       ]);
     } finally {
       setLoading(false);
@@ -70,7 +71,7 @@ export default function ChatBot() {
               </div>
               <div>
                 <p className="text-white font-semibold text-sm leading-tight">RecallAlert AI</p>
-                <p className="text-slate-400 text-xs">Food safety assistant</p>
+                <p className="text-slate-400 text-xs">{t("chat.assistant")}</p>
               </div>
             </div>
             <button
@@ -104,7 +105,7 @@ export default function ChatBot() {
             {loading && (
               <div className="flex justify-start">
                 <div className="bg-navy-800 border border-navy-700 text-slate-400 px-3 py-2 rounded-2xl rounded-bl-sm text-sm">
-                  <span className="animate-pulse">Thinking…</span>
+                  <span className="animate-pulse">{t("chat.thinking")}</span>
                 </div>
               </div>
             )}
@@ -117,7 +118,7 @@ export default function ChatBot() {
             <input
               ref={inputRef}
               className="flex-1 text-sm border border-navy-700 bg-navy-900 text-white placeholder-slate-500 rounded-full px-3 py-1.5 outline-none focus:border-primary/60 transition-colors"
-              placeholder="Ask about recalls…"
+              placeholder={t("chat.placeholder")}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}

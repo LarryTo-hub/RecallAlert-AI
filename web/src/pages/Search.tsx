@@ -3,12 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchRecalls } from "@/api/client";
 import RecallCard from "@/components/RecallCard";
 import { SkeletonCard } from "@/components/Skeleton";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 export default function Search() {
   const [query, setQuery] = useState("");
   const [committed, setCommitted] = useState("");
   const [source, setSource] = useState("");
   const [status, setStatus] = useState("");
+  const { t } = useTranslation();
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["search", committed, source, status],
@@ -26,7 +28,7 @@ export default function Search() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      <h1 className="text-xl font-bold text-white mb-4">Search Recalls</h1>
+      <h1 className="text-xl font-bold text-white mb-4">{t("search.title")}</h1>
 
       {/* Search input */}
       <form
@@ -38,18 +40,18 @@ export default function Search() {
       >
         <input
           type="search"
-          placeholder="Search product, brand, company, reason…"
+          placeholder={t("search.placeholder")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="flex-1 border border-navy-700 bg-navy-800 text-white placeholder-slate-500 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-          aria-label="Search recalls"
+          aria-label={t("search.title")}
         />
         <button
           type="submit"
           className="bg-primary text-white px-4 rounded-xl font-medium text-sm hover:bg-primary-dark transition-colors"
-          aria-label="Search"
+          aria-label={t("search.button")}
         >
-          Search
+          {t("search.button")}
         </button>
       </form>
 
@@ -59,9 +61,9 @@ export default function Search() {
           value={source}
           onChange={(e) => { setSource(e.target.value); setCommitted(query.trim()); }}
           className="border border-navy-700 bg-navy-800 text-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
-          aria-label="Filter by source"
+          aria-label={t("search.allSources")}
         >
-          <option value="">All sources</option>
+          <option value="">{t("search.allSources")}</option>
           <option value="FDA">FDA</option>
           <option value="USDA">USDA</option>
         </select>
@@ -70,12 +72,12 @@ export default function Search() {
           value={status}
           onChange={(e) => { setStatus(e.target.value); setCommitted(query.trim()); }}
           className="border border-navy-700 bg-navy-800 text-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
-          aria-label="Filter by status"
+          aria-label={t("search.allStatuses")}
         >
-          <option value="">All statuses</option>
-          <option value="ACTIVE">Active</option>
-          <option value="CLOSED">Closed</option>
-          <option value="TERMINATED">Terminated</option>
+          <option value="">{t("search.allStatuses")}</option>
+          <option value="ACTIVE">{t("search.statusActive")}</option>
+          <option value="CLOSED">{t("search.statusClosed")}</option>
+          <option value="TERMINATED">{t("search.statusTerminated")}</option>
         </select>
 
         {(committed || source || status) && (
@@ -88,7 +90,7 @@ export default function Search() {
             }}
             className="px-3 py-2 text-xs text-slate-400 border border-navy-700 bg-navy-800 rounded-lg hover:bg-navy-700 hover:text-white transition-colors"
           >
-            Clear filters
+            {t("search.clearFilters")}
           </button>
         )}
       </div>
@@ -100,15 +102,15 @@ export default function Search() {
         </div>
       ) : !committed && !source && !status ? (
         <div className="text-center py-16 text-slate-500">
-          <p className="text-sm">Enter a search term to find recalls</p>
+          <p className="text-sm">{t("search.hint")}</p>
         </div>
       ) : recalls.length === 0 ? (
         <div className="text-center py-12 text-slate-500 text-sm">
-          No results found for "{committed}".
+          {t("search.noResults", { q: committed })}
         </div>
       ) : (
         <>
-          <p className="text-xs text-slate-500 mb-3">{recalls.length} result(s)</p>
+          <p className="text-xs text-slate-500 mb-3">{t("search.resultCount", { n: String(recalls.length) })}</p>
           <div className="flex flex-col gap-3">
             {recalls.map((r, i) => (
               <RecallCard key={`${r.recall_number ?? i}-${r.source}`} recall={r} index={i} />

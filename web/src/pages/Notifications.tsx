@@ -4,6 +4,7 @@ import {
   saveNotificationSettings,
   saveEmailSettings, getEmailSettings,
 } from "@/api/client";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 const LANGUAGES = [
   { code: "en", label: "English" },
@@ -27,6 +28,7 @@ const SOURCES = [
 ];
 
 export default function Notifications() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [notifyNewOnly, setNotifyNewOnly] = useState(true);
   const [language, setLanguage] = useState(
@@ -69,9 +71,9 @@ export default function Notifications() {
       localStorage.setItem("language", language);
       localStorage.setItem("severity_threshold", threshold);
       localStorage.setItem("sources", sources);
-      showToast("Settings saved");
+      showToast(t("notif.saved"));
     },
-    onError: (e: Error) => showToast(`Failed: ${e.message}`, false),
+    onError: (e: Error) => showToast(t("notif.saveFailed", { error: e.message }), false),
   });
 
   return (
@@ -83,19 +85,19 @@ export default function Notifications() {
         </div>
       )}
 
-      <h1 className="text-xl font-bold text-white mb-5">Notifications</h1>
+      <h1 className="text-xl font-bold text-white mb-5">{t("notif.title")}</h1>
 
       {/* Email setup */}
       <section className="bg-navy-800 rounded-xl border border-navy-700 p-5 mb-4">
         <h2 className="font-semibold text-white mb-1">
-          Email Alerts
+          {t("notif.emailAlerts")}
         </h2>
         <p className="text-xs text-slate-400 mb-3">
-          Enter your email to receive food recall alerts when items in your pantry are affected.
+          {t("notif.emailHint")}
         </p>
 
         <label className="block text-xs text-slate-400 mb-1" htmlFor="email">
-          Your Email Address
+          {t("notif.emailAddress")}
         </label>
         <input
           id="email"
@@ -110,7 +112,7 @@ export default function Notifications() {
       {/* Email preference */}
       <section className="bg-navy-800 rounded-xl border border-navy-700 p-5 mb-4">
         <h2 className="font-semibold text-white mb-3">
-          Email Preferences
+          {t("notif.emailPrefs")}
         </h2>
         <div className="flex flex-col gap-2">
           <label className="flex items-center gap-2.5 cursor-pointer">
@@ -122,8 +124,8 @@ export default function Notifications() {
               className="accent-primary"
             />
             <div>
-              <span className="text-sm text-white font-medium">New recalls only</span>
-              <p className="text-xs text-slate-400">Only email me when a brand new recall matches my pantry.</p>
+              <span className="text-sm text-white font-medium">{t("notif.newOnly")}</span>
+              <p className="text-xs text-slate-400">{t("notif.newOnlyHint")}</p>
             </div>
           </label>
           <label className="flex items-center gap-2.5 cursor-pointer">
@@ -135,8 +137,8 @@ export default function Notifications() {
               className="accent-primary"
             />
             <div>
-              <span className="text-sm text-white font-medium">All pantry matches</span>
-              <p className="text-xs text-slate-400">Email me for any recall, including existing ones, that matches my pantry.</p>
+              <span className="text-sm text-white font-medium">{t("notif.allMatches")}</span>
+              <p className="text-xs text-slate-400">{t("notif.allMatchesHint")}</p>
             </div>
           </label>
         </div>
@@ -145,7 +147,7 @@ export default function Notifications() {
       {/* Language */}
       <section className="bg-navy-800 rounded-xl border border-navy-700 p-5 mb-4">
         <h2 className="font-semibold text-white mb-3">
-          Alert Language
+          {t("notif.alertLanguage")}
         </h2>
         <div className="grid grid-cols-3 gap-2">
           {LANGUAGES.map((lang) => (
@@ -167,7 +169,7 @@ export default function Notifications() {
       {/* Severity threshold */}
       <section className="bg-navy-800 rounded-xl border border-navy-700 p-5 mb-4">
         <h2 className="font-semibold text-white mb-3">
-          Severity Threshold
+          {t("notif.severityThreshold")}
         </h2>
         <div className="flex flex-col gap-2">
           {THRESHOLDS.map((t) => (
@@ -189,7 +191,7 @@ export default function Notifications() {
       {/* Sources */}
       <section className="bg-navy-800 rounded-xl border border-navy-700 p-5 mb-5">
         <h2 className="font-semibold text-white mb-3">
-          Recall Sources
+          {t("notif.recallSources")}
         </h2>
         <div className="flex flex-col gap-2">
           {SOURCES.map((s) => (
@@ -213,7 +215,7 @@ export default function Notifications() {
         disabled={saveMutation.isPending}
         className="w-full bg-primary text-white font-semibold rounded-xl py-3 hover:bg-primary-dark transition-colors disabled:opacity-60"
       >
-        {saveMutation.isPending ? "Saving…" : "Save Settings"}
+        {saveMutation.isPending ? t("notif.saving") : t("notif.save")}
       </button>
     </div>
   );

@@ -1,5 +1,6 @@
 import type { Recall } from "@/api/client";
 import SeverityBadge from "./SeverityBadge";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 interface Props {
   recall: Recall;
@@ -30,6 +31,7 @@ function formatDate(val: string | null | undefined): string {
 }
 
 export default function RecallCard({ recall, severity }: Props) {
+  const { t } = useTranslation();
   const displayStatus = normalizeStatus(recall.status);
   const statusCls = statusColors[displayStatus ?? ""] ?? "text-gray-500";
   const sourceLabel = recall.source?.startsWith("FDA") ? "FDA" : "USDA";
@@ -83,7 +85,7 @@ export default function RecallCard({ recall, severity }: Props) {
       <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-navy-700">
         <div className="flex flex-col gap-0.5">
           {recall.company_name && <span>{recall.company_name}</span>}
-          {recall.affected_area && <span>Area: {recall.affected_area}</span>}
+          {recall.affected_area && <span>{t("card.area", { area: recall.affected_area })}</span>}
         </div>
         <div className="flex items-center gap-3">
           <span>{formatDate(recall.report_date ?? recall.recall_initiation_date)}</span>
@@ -93,9 +95,9 @@ export default function RecallCard({ recall, severity }: Props) {
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary-light font-medium hover:underline"
-              aria-label="View official recall page"
+              aria-label={t("card.details")}
             >
-              Details ↗
+              {t("card.details")}
             </a>
           )}
         </div>

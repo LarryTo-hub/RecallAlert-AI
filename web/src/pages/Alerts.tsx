@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchAlerts, updateAlertFeedback, fetchStats, type AlertRecord } from "@/api/client";
 import { SkeletonRow } from "@/components/Skeleton";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 const FILTERS = ["all", "sent", "disposed", "ignored"] as const;
 type Filter = typeof FILTERS[number];
@@ -14,6 +15,7 @@ const statusStyle: Record<string, string> = {
 
 function AlertRow({ alert }: { alert: AlertRecord }) {
   const qc = useQueryClient();
+  const { t } = useTranslation();
 
   const mutation = useMutation({
     mutationFn: ({ status }: { status: "disposed" | "ignored" }) =>
@@ -53,14 +55,14 @@ function AlertRow({ alert }: { alert: AlertRecord }) {
             disabled={mutation.isPending}
             className="flex-1 text-xs font-medium bg-emerald-900/40 text-emerald-400 border border-emerald-700/40 rounded-lg py-2 hover:bg-emerald-900/60 transition-colors disabled:opacity-60"
           >
-            Mark Disposed
+            {t("alerts.markDisposed")}
           </button>
           <button
             onClick={() => mutation.mutate({ status: "ignored" })}
             disabled={mutation.isPending}
             className="flex-1 text-xs font-medium bg-navy-700 text-slate-400 border border-navy-600 rounded-lg py-2 hover:bg-navy-600 hover:text-white transition-colors disabled:opacity-60"
           >
-            Ignore
+            {t("alerts.ignore")}
           </button>
         </div>
       )}
@@ -70,6 +72,7 @@ function AlertRow({ alert }: { alert: AlertRecord }) {
 
 export default function Alerts() {
   const [filter, setFilter] = useState<Filter>("all");
+  const { t } = useTranslation();
 
   const { data, isLoading } = useQuery({
     queryKey: ["alerts", filter],
@@ -85,15 +88,15 @@ export default function Alerts() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      <h1 className="text-xl font-bold text-white mb-4">Alert History</h1>
+      <h1 className="text-xl font-bold text-white mb-4">{t("alerts.title")}</h1>
 
       {/* Stats bar */}
       {stats && (
         <div className="grid grid-cols-3 gap-3 mb-5">
           {[
-            { label: "Total Alerts", value: stats.total_alerts },
-            { label: "Disposed", value: stats.disposed },
-            { label: "Ignored", value: stats.ignored },
+            { label: t("alerts.total"), value: stats.total_alerts },
+            { label: t("alerts.disposed"), value: stats.disposed },
+            { label: t("alerts.ignored"), value: stats.ignored },
           ].map((s) => (
             <div key={s.label} className="bg-navy-800 rounded-xl border border-navy-700 p-3 text-center">
               <p className="text-2xl font-bold text-white">{s.value}</p>
@@ -112,7 +115,7 @@ export default function Alerts() {
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors capitalize
               ${filter === f ? "bg-primary text-white" : "bg-navy-800 text-slate-400 border border-navy-700 hover:border-navy-600 hover:text-white"}`}
           >
-            {f}
+            {t(`alerts.filter${f.charAt(0).toUpperCase()}${f.slice(1)}`)}
           </button>
         ))}
       </div>
@@ -127,7 +130,7 @@ export default function Alerts() {
         </div>
       ) : alerts.length === 0 ? (
         <div className="text-center py-12 text-slate-500 text-sm">
-          No alerts yet. Add items to your pantry to start receiving recall alerts.
+          {t("alerts.noAlerts")}
         </div>
       ) : (
         <div className="flex flex-col gap-3">

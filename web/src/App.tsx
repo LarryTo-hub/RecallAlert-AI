@@ -8,9 +8,11 @@ import Alerts from "@/pages/Alerts";
 import Notifications from "@/pages/Notifications";
 import Search from "@/pages/Search";
 import Settings from "@/pages/Settings";
+import { LanguageProvider } from "@/i18n/LanguageContext";
 
 export default function App() {
   return (
+    <LanguageProvider>
     <BrowserRouter>
       <div className="flex h-screen overflow-hidden bg-navy-900">
         {/* Sidebar nav — visible on md+ */}
@@ -36,5 +38,6 @@ export default function App() {
         <ChatBot />
       </div>
     </BrowserRouter>
+    </LanguageProvider>
   );
 }

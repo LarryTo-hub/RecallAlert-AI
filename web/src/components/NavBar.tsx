@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 interface Props {
   variant: "sidebar" | "bottom";
@@ -56,12 +57,12 @@ function ShieldIcon() {
 }
 
 const links = [
-  { to: "/dashboard", label: "Dashboard", Icon: HomeIcon },
-  { to: "/pantry",    label: "Pantry",    Icon: PantryIcon },
-  { to: "/alerts",   label: "Alerts",    Icon: AlertIcon },
-  { to: "/search",   label: "Search",    Icon: SearchIcon },
-  { to: "/notifications", label: "Notify", Icon: MailIcon },
-  { to: "/settings", label: "Settings",  Icon: CogIcon },
+  { to: "/dashboard", label: "nav.dashboard", Icon: HomeIcon },
+  { to: "/pantry",    label: "nav.pantry",    Icon: PantryIcon },
+  { to: "/alerts",   label: "nav.alerts",    Icon: AlertIcon },
+  { to: "/search",   label: "nav.search",    Icon: SearchIcon },
+  { to: "/notifications", label: "nav.notify", Icon: MailIcon },
+  { to: "/settings", label: "nav.settings",  Icon: CogIcon },
 ];
 
 function NavItem({
@@ -75,6 +76,7 @@ function NavItem({
   Icon: () => JSX.Element;
   compact: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <NavLink
       to={to}
@@ -86,10 +88,10 @@ function NavItem({
         }
         ${compact ? "flex-col gap-1 px-0 py-2 text-[10px] border-l-0 border-b-0 rounded-none" : ""}`
       }
-      aria-label={label}
+      aria-label={t(label)}
     >
       <Icon />
-      <span>{label}</span>
+      <span>{t(label)}</span>
     </NavLink>
   );
 }
