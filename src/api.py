@@ -504,12 +504,13 @@ async def match_pantry(user_id: str = Query("")):
         the ingredient list) and skips single-word generic items that have no
         brand, so it cannot re-introduce ingredient-based false positives.
         """
-        from src.agent import _extract_product_name, _tokenize
+        from src.agent import _extract_product_name, _tokenize, _normalize_name
 
         # Build a clean search text from structural fields only — NO ingredient lists.
         clean_desc = _extract_product_name(str(recall.get("product_description") or ""))
         brand_name = str(recall.get("brand_name") or "")
         clean_text = (clean_desc + " " + brand_name).lower()
+        recall_norm = _normalize_name(clean_desc + " " + brand_name)
 
         matched_items = []
         for item in pantry_items:
@@ -519,6 +520,7 @@ async def match_pantry(user_id: str = Query("")):
                 continue
 
             item_tokens = _tokenize(name)
+            item_norm = _normalize_name(name)
 
             # Skip single-word generic pantry items with no brand — they must
             # pass the LLM stage; the fallback cannot safely distinguish a bare
@@ -528,6 +530,14 @@ async def match_pantry(user_id: str = Query("")):
 
             name_lower = name.lower()
             recall_tokens = _tokenize(clean_text)
+
+            # Fuzzy collapsed-name check catches "Ready Meal" vs "readymeal".
+            import re as _re2
+            item_spaceless = _re2.sub(r"[^a-z0-9]", "", name_lower)
+            recall_spaceless = _re2.sub(r"[^a-z0-9]", "", clean_text)
+            if item_spaceless and len(item_spaceless) >= 4 and item_spaceless in recall_spaceless:
+                matched_items.append(item)
+                continue
 
             # Coverage ratio: the pantry item's overlapping tokens must account
             # for ≥40% of the recall's product-name tokens. A pantry item that
@@ -566,8 +576,26 @@ async def match_pantry(user_id: str = Query("")):
         if not matched_items:
             continue
 
+        # Boost severity to "high" when the pantry item name closely matches
+        # the recalled product name — an exact/near-exact name match is high risk.
+        from src.agent import _tokenize, _extract_product_name
+        base_severity = (parsed.get("severity") or "medium").lower()
+        recall_product_tokens: set = set()
+        for _p in (parsed.get("products") or []):
+            recall_product_tokens |= _tokenize(_extract_product_name(_p))
+        for _b in (parsed.get("brands") or []):
+            recall_product_tokens |= _tokenize(_b)
+        for _mi in matched_items:
+            _item_tokens = _tokenize(_mi.get("product_name", ""))
+            if _mi.get("brand"):
+                _item_tokens |= _tokenize(_mi["brand"])
+            if recall_product_tokens and _item_tokens:
+                _coverage = len(_item_tokens & recall_product_tokens) / len(_item_tokens)
+                if _coverage >= 0.8 and base_severity != "high":
+                    base_severity = "high"
+                    break
         parsed_payload = {
-            "severity": parsed.get("severity") or "unknown",
+            "severity": base_severity,
             "reason_summary": parsed.get("reason_summary")
             or (recall.get("reason_for_recall") or ""),
             "products": parsed.get("products") or [],
