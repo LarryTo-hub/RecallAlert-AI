@@ -1010,3 +1010,34 @@ async def get_notification_settings(user_id: str = Query("")):
         severity_threshold=getattr(user, "severity_threshold", "all"),
         sources=getattr(user, "sources", "both"),
     )
+
+@app.get("/api/recalls")
+async def api_get_recalls(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    source: Optional[str] = None,
+    status: Optional[str] = None,
+    q: Optional[str] = None,
+    sort: str = Query("latest"),
+):
+    return await get_recalls(offset, limit, source, status, q, sort)
+
+
+@app.get("/api/stats", response_model=StatsResponse)
+async def api_get_stats(user_id: str = Query("")):
+    return await get_stats(user_id)
+
+
+@app.get("/api/pantry", response_model=PantryListResponse)
+async def api_get_pantry(user_id: str = Query("")):
+    return await get_pantry_endpoint(user_id)
+
+
+@app.post("/api/pantry/items", response_model=PantryItemResponse)
+async def api_add_pantry_item(item: PantryItemRequest, user_id: str = Query("")):
+    return await add_pantry_item_endpoint(item, user_id)
+
+
+@app.post("/api/fetch")
+async def api_trigger_fetch():
+    return await trigger_fetch()
