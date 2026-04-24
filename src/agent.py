@@ -425,3 +425,58 @@ def ocr_receipt(image_bytes: bytes) -> List[Dict[str, str]]:
     except Exception:
         logger.exception("Gemini OCR failed")
         return []
+
+
+# ── Chatbot ───────────────────────────────────────────────────────────────
+
+def chat_with_agent(
+    message: str,
+    pantry_items: List[Dict[str, Any]],
+    recent_recalls: List[Dict[str, Any]],
+) -> str:
+    """Answer a user's food-safety question using Gemini with recall + pantry context.
+
+    Args:
+        message: The user's chat message.
+        pantry_items: List of the user's current pantry items.
+        recent_recalls: A sample of recent recalls for context.
+
+    Returns:
+        A plain-text reply string.
+    """
+    pantry_summary = (
+        "\n".join(
+            f"- {item.get('product_name', 'Unknown')}"
+            + (f" (brand: {item['brand']})" if item.get("brand") else "")
+            for item in pantry_items
+        )
+        if pantry_items
+        else "No items in pantry."
+    )
+
+    recall_summary = (
+        "\n".join(
+            f"- {r.get('product_description', 'Unknown')} | Reason: {r.get('reason_for_recall', 'N/A')} | Status: {r.get('status', 'N/A')}"
+            for r in recent_recalls[:15]
+        )
+        if recent_recalls
+        else "No recent recalls available."
+    )
+
+    prompt = (
+        "You are RecallAlert AI, a helpful food safety assistant. "
+        "You help users understand food recalls and whether their pantry items are affected.\n\n"
+        "Be concise and friendly. Use plain text (no markdown). "
+        "If the user asks about their pantry, use the pantry context below. "
+        "If they ask to list recalls, summarize the recent recalls context below.\n\n"
+        f"User's pantry:\n{pantry_summary}\n\n"
+        f"Recent recalls:\n{recall_summary}\n\n"
+        f"User message: {message}"
+    )
+
+    try:
+        resp = _get_client().models.generate_content(model=_MODEL, contents=prompt)
+        return resp.text.strip()
+    except Exception:
+        logger.exception("Gemini chat failed")
+        return "I'm having trouble connecting to my AI backend right now. Please try again in a moment."

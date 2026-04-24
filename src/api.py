@@ -814,6 +814,58 @@ async def trigger_fetch():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Chat Endpoint
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class ChatRequest(BaseModel):
+    message: str
+    user_id: str = ""
+
+
+@app.post("/chat")
+async def chat_endpoint(body: ChatRequest):
+    """AI chatbot endpoint — answers food-safety questions using Gemini."""
+    from src.agent import chat_with_agent
+    from src.models import get_or_create_user_by_key, get_pantry
+    from src.store import get_all_recalls
+
+    if not body.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    try:
+        user = get_or_create_user_by_key(body.user_id)
+        pantry = get_pantry(user.id)
+        pantry_dicts = [
+            {"product_name": p.product_name, "brand": p.brand, "lot_code": p.lot_code}
+            for p in pantry
+        ]
+        recent_recalls = get_all_recalls(skip=0, limit=20)
+        if not isinstance(recent_recalls, list):
+            recent_recalls = list(recent_recalls)
+        # Convert ORM objects to plain dicts if needed
+        recall_dicts = []
+        for r in recent_recalls:
+            if isinstance(r, dict):
+                recall_dicts.append(r)
+            else:
+                recall_dicts.append({
+                    "product_description": getattr(r, "product_description", ""),
+                    "reason_for_recall": getattr(r, "reason_for_recall", ""),
+                    "status": getattr(r, "status", ""),
+                    "brand_name": getattr(r, "brand_name", ""),
+                })
+
+        reply = chat_with_agent(body.message, pantry_dicts, recall_dicts)
+        return {"reply": reply}
+    except Exception as e:
+        logger.exception("Chat endpoint error: %s", e)
+        raise HTTPException(status_code=500, detail="Chat failed")
+
+
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Cloud Run."""
