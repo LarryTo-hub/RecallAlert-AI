@@ -104,17 +104,17 @@ export async function fetchRecalls(params?: {
   if (params?.status) sp.set("status", params.status);
   if (params?.q) sp.set("q", params.q);
   if (params?.sort) sp.set("sort", params.sort);
-  return request(`/recalls?${sp}`);
+  return request(`/api/recalls?${sp}`);
 }
 
 export async function triggerFetch(): Promise<{ status: string; count?: number }> {
-  return request("/fetch", { method: "POST" });
+  return request(`/fetch`, { method: "POST" });
 }
 
 // ── Pantry ─────────────────────────────────────────────────────────────────
 
 export async function fetchPantry(): Promise<{ items: PantryItem[] }> {
-  return request(`/pantry?user_id=${getUserId()}`);
+  return request(`/api/pantry?user_id=${getUserId()}`);
 }
 
 export async function addPantryItem(body: {
@@ -122,22 +122,22 @@ export async function addPantryItem(body: {
   brand?: string;
   lot_code?: string;
 }): Promise<PantryItem> {
-  return request(`/pantry/items?user_id=${getUserId()}`, {
+  return request(`/api/pantry/items?user_id=${getUserId()}`, {
     method: "POST",
     body: JSON.stringify(body),
   });
 }
 
 export async function deletePantryItem(id: number): Promise<void> {
-  return request(`/pantry/items/${id}?user_id=${getUserId()}`, { method: "DELETE" });
+  return request(`/api/pantry/items/${id}?user_id=${getUserId()}`, { method: "DELETE" });
 }
 
 export async function clearPantry(): Promise<{ deleted: number }> {
-  return request(`/pantry?user_id=${getUserId()}`, { method: "DELETE" });
+  return request(`/api/pantry?user_id=${getUserId()}`, { method: "DELETE" });
 }
 
 export function pantryExportUrl(): string {
-  return `${BASE}/pantry/export?user_id=${getUserId()}`;
+  return `${BASE}/api/pantry/export?user_id=${getUserId()}`;
 }
 
 // ── OCR ────────────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ export function pantryExportUrl(): string {
 export async function ocrReceipt(file: File): Promise<{ items: OcrItem[] }> {
   const fd = new FormData();
   fd.append("file", file);
-  const res = await fetch(`${BASE}/ocr`, { method: "POST", body: fd });
+  const res = await fetch(`${BASE}/api/ocr`, { method: "POST", body: fd });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail ?? "OCR failed");
@@ -156,7 +156,7 @@ export async function ocrReceipt(file: File): Promise<{ items: OcrItem[] }> {
 // ── Match ──────────────────────────────────────────────────────────────────
 
 export async function matchPantry(): Promise<{ matches: MatchResult[] }> {
-  return request(`/match?user_id=${getUserId()}`, { method: "POST" });
+  return request(`/api/match?user_id=${getUserId()}`, { method: "POST" });
 }
 
 // ── Alerts ─────────────────────────────────────────────────────────────────
@@ -164,14 +164,14 @@ export async function matchPantry(): Promise<{ matches: MatchResult[] }> {
 export async function fetchAlerts(status?: string): Promise<{ alerts: AlertRecord[] }> {
   const sp = new URLSearchParams({ user_id: getUserId() });
   if (status) sp.set("status", status);
-  return request(`/alerts?${sp}`);
+  return request(`/api/alerts?${sp}`);
 }
 
 export async function updateAlertFeedback(
   id: number,
   status: "disposed" | "ignored"
 ): Promise<AlertRecord> {
-  return request(`/alerts/${id}/feedback?user_id=${getUserId()}`, {
+  return request(`/api/alerts/${id}/feedback?user_id=${getUserId()}`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
   });
@@ -184,7 +184,7 @@ export async function saveNotificationSettings(body: {
   severity_threshold: string;
   sources: string;
 }): Promise<unknown> {
-  return request(`/notifications/settings?user_id=${getUserId()}`, {
+  return request(`/api/notifications/settings?user_id=${getUserId()}`, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -194,26 +194,26 @@ export async function saveEmailSettings(body: {
   email: string;
   notify_new_only: boolean;
 }): Promise<unknown> {
-  return request(`/notifications/email?user_id=${getUserId()}`, {
+  return request(`/api/notifications/email?user_id=${getUserId()}`, {
     method: "POST",
     body: JSON.stringify(body),
   });
 }
 
 export async function getEmailSettings(): Promise<{ email: string; notify_new_only: boolean }> {
-  return request(`/notifications/email?user_id=${getUserId()}`);
+  return request(`/api/notifications/email?user_id=${getUserId()}`);
 }
 
 // ── Stats ──────────────────────────────────────────────────────────────────
 
 export async function fetchStats(): Promise<Stats> {
-  return request(`/stats?user_id=${getUserId()}`);
+  return request(`/api/stats?user_id=${getUserId()}`);
 }
 
 // ── Chat (AI) ──────────────────────────────────────────────────────────────
 
 export async function sendChatMessage(message: string): Promise<{ reply: string }> {
-  return request("/chat", {
+  return request("/api/chat", {
     method: "POST",
     body: JSON.stringify({ message, user_id: getUserId() }),
   });
