@@ -176,7 +176,7 @@ app = FastAPI(
 )
 
 # Enable CORS for React frontend
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -403,6 +403,8 @@ async def get_recalls(
         upper = value.strip().upper()
         if upper in {"ACTIVE", "CLOSED", "TERMINATED"}:
             return upper
+        if upper in {"INACTIVE", "RESOLVED", "COMPLETE", "COMPLETED"}:
+            return upper
         return value.strip()
 
     def normalize_date(value: Optional[str]) -> Optional[str]:
@@ -502,12 +504,13 @@ async def match_pantry(user_id: str = Query("")):
         the ingredient list) and skips single-word generic items that have no
         brand, so it cannot re-introduce ingredient-based false positives.
         """
-        from src.agent import _extract_product_name, _tokenize
+        from src.agent import _extract_product_name, _tokenize, _normalize_name
 
         # Build a clean search text from structural fields only — NO ingredient lists.
         clean_desc = _extract_product_name(str(recall.get("product_description") or ""))
         brand_name = str(recall.get("brand_name") or "")
         clean_text = (clean_desc + " " + brand_name).lower()
+        recall_norm = _normalize_name(clean_desc + " " + brand_name)
 
         matched_items = []
         for item in pantry_items:
@@ -517,6 +520,7 @@ async def match_pantry(user_id: str = Query("")):
                 continue
 
             item_tokens = _tokenize(name)
+            item_norm = _normalize_name(name)
 
             # Skip single-word generic pantry items with no brand — they must
             # pass the LLM stage; the fallback cannot safely distinguish a bare
@@ -526,6 +530,14 @@ async def match_pantry(user_id: str = Query("")):
 
             name_lower = name.lower()
             recall_tokens = _tokenize(clean_text)
+
+            # Fuzzy collapsed-name check catches "Ready Meal" vs "readymeal".
+            import re as _re2
+            item_spaceless = _re2.sub(r"[^a-z0-9]", "", name_lower)
+            recall_spaceless = _re2.sub(r"[^a-z0-9]", "", clean_text)
+            if item_spaceless and len(item_spaceless) >= 4 and item_spaceless in recall_spaceless:
+                matched_items.append(item)
+                continue
 
             # Coverage ratio: the pantry item's overlapping tokens must account
             # for ≥40% of the recall's product-name tokens. A pantry item that
@@ -564,8 +576,26 @@ async def match_pantry(user_id: str = Query("")):
         if not matched_items:
             continue
 
+        # Boost severity to "high" when the pantry item name closely matches
+        # the recalled product name — an exact/near-exact name match is high risk.
+        from src.agent import _tokenize, _extract_product_name
+        base_severity = (parsed.get("severity") or "medium").lower()
+        recall_product_tokens: set = set()
+        for _p in (parsed.get("products") or []):
+            recall_product_tokens |= _tokenize(_extract_product_name(_p))
+        for _b in (parsed.get("brands") or []):
+            recall_product_tokens |= _tokenize(_b)
+        for _mi in matched_items:
+            _item_tokens = _tokenize(_mi.get("product_name", ""))
+            if _mi.get("brand"):
+                _item_tokens |= _tokenize(_mi["brand"])
+            if recall_product_tokens and _item_tokens:
+                _coverage = len(_item_tokens & recall_product_tokens) / len(_item_tokens)
+                if _coverage >= 0.8 and base_severity != "high":
+                    base_severity = "high"
+                    break
         parsed_payload = {
-            "severity": parsed.get("severity") or "unknown",
+            "severity": base_severity,
             "reason_summary": parsed.get("reason_summary")
             or (recall.get("reason_for_recall") or ""),
             "products": parsed.get("products") or [],
@@ -784,6 +814,58 @@ async def trigger_fetch():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Chat Endpoint
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class ChatRequest(BaseModel):
+    message: str
+    user_id: str = ""
+
+
+@app.post("/chat")
+async def chat_endpoint(body: ChatRequest):
+    """AI chatbot endpoint — answers food-safety questions using Gemini."""
+    from src.agent import chat_with_agent
+    from src.models import get_or_create_user_by_key, get_pantry
+    from src.store import get_all_recalls
+
+    if not body.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    try:
+        user = get_or_create_user_by_key(body.user_id)
+        pantry = get_pantry(user.id)
+        pantry_dicts = [
+            {"product_name": p.product_name, "brand": p.brand, "lot_code": p.lot_code}
+            for p in pantry
+        ]
+        recent_recalls = get_all_recalls(skip=0, limit=20)
+        if not isinstance(recent_recalls, list):
+            recent_recalls = list(recent_recalls)
+        # Convert ORM objects to plain dicts if needed
+        recall_dicts = []
+        for r in recent_recalls:
+            if isinstance(r, dict):
+                recall_dicts.append(r)
+            else:
+                recall_dicts.append({
+                    "product_description": getattr(r, "product_description", ""),
+                    "reason_for_recall": getattr(r, "reason_for_recall", ""),
+                    "status": getattr(r, "status", ""),
+                    "brand_name": getattr(r, "brand_name", ""),
+                })
+
+        reply = chat_with_agent(body.message, pantry_dicts, recall_dicts)
+        return {"reply": reply}
+    except Exception as e:
+        logger.exception("Chat endpoint error: %s", e)
+        raise HTTPException(status_code=500, detail="Chat failed")
+
+
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Cloud Run."""
@@ -798,68 +880,6 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs",
     }
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Chat (AI Assistant)
-# ──────────────────────────────────────────────────────────────────────────────
-
-class ChatRequest(BaseModel):
-    message: str = Field(..., min_length=1)
-    user_id: str = ""
-
-
-class ChatResponse(BaseModel):
-    reply: str
-
-
-@app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    """Chat with RecallAlert AI for recall questions and disposal instructions."""
-    try:
-        from src import agent
-        
-        from src.models import get_or_create_user_by_key
-
-        user = get_or_create_user_by_key(request.user_id)
-        message = request.message.strip()
-        
-        # Get user's pantry if registered
-        pantry = []
-        try:
-            from src.models import get_pantry
-            pantry = get_pantry(user.id)
-        except Exception:
-            pass
-        
-        # Build context
-        pantry_str = ""
-        if pantry:
-            items = [f"{getattr(item, 'product_name', '?')}" + 
-                     (f" ({getattr(item, 'brand', '')})" if getattr(item, 'brand', None) else "") 
-                     for item in pantry]
-            pantry_str = f"\nUser's pantry items: {', '.join(items)}"
-        
-        # Generate response
-        prompt = (
-            "You are RecallAlert AI, a friendly food safety assistant. "
-            "Answer user questions about food recalls, disposal instructions, "
-            "food safety, and whether their pantry items might be affected.\n"
-            "Be concise (1-3 sentences), practical, and reassuring.\n"
-            f"{pantry_str}\n\n"
-            f"User: {message}"
-        )
-        
-        resp = agent._get_client().models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt
-        )
-        reply = resp.text.strip()
-        
-        return ChatResponse(reply=reply)
-    except Exception as e:
-        logger.exception("Chat error: %s", e)
-        return ChatResponse(reply="Sorry, I'm having trouble responding right now. Please try again later.")
 
 
 @app.get("/stats", response_model=StatsResponse)

@@ -39,15 +39,19 @@ export default function InstallPrompt() {
   return (
     <div
       className="fixed bottom-20 md:bottom-6 left-4 right-4 md:left-auto md:right-6 md:w-80 z-50
-        bg-white rounded-xl shadow-xl border border-gray-200 p-4"
+        bg-navy-800 rounded-xl shadow-2xl border border-navy-700 p-4"
       role="dialog"
       aria-label="Install RecallAlert AI"
     >
       <div className="flex items-start gap-3">
-        <span className="text-3xl shrink-0" aria-hidden="true">🔔</span>
+        <div className="w-8 h-8 text-primary shrink-0 mt-0.5">
+          <svg fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+          </svg>
+        </div>
         <div className="flex-1">
-          <p className="font-semibold text-gray-900 text-sm">Add to Home Screen</p>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="font-semibold text-white text-sm">Add to Home Screen</p>
+          <p className="text-xs text-slate-400 mt-0.5">
             Install RecallAlert AI for instant access and offline support.
           </p>
         </div>
@@ -61,14 +65,14 @@ export default function InstallPrompt() {
         </button>
         <button
           onClick={() => dismiss(false)}
-          className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
+          className="px-3 py-2 text-sm text-slate-400 hover:text-white"
           aria-label="Dismiss"
         >
           Later
         </button>
         <button
           onClick={() => dismiss(true)}
-          className="px-3 py-2 text-sm text-gray-400 hover:text-gray-600 text-xs"
+          className="px-3 py-2 text-sm text-slate-500 hover:text-slate-300 text-xs"
           aria-label="Don't ask again"
         >
           Never

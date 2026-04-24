@@ -4,22 +4,29 @@ import { useNavigate } from "react-router-dom";
 import { fetchRecalls, fetchStats, triggerFetch } from "@/api/client";
 import RecallCard from "@/components/RecallCard";
 import { SkeletonCard } from "@/components/Skeleton";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 const SOURCES = ["All", "FDA", "USDA"];
-const STATUSES = ["All", "ACTIVE", "CLOSED", "TERMINATED"];
-const SORTS: Array<{ value: "latest" | "oldest"; label: string }> = [
-  { value: "latest", label: "Newest first" },
-  { value: "oldest", label: "Oldest first" },
-];
 
 export default function Dashboard() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [source, setSource] = useState("All");
   const [status, setStatus] = useState("All");
   const [sort, setSort] = useState<"latest" | "oldest">("latest");
   const [offset, setOffset] = useState(0);
   const LIMIT = 20;
+
+  const STATUSES = [
+    { label: t("dash.statusAll"), value: "All" },
+    { label: t("dash.statusActive"), value: "ACTIVE" },
+    { label: t("dash.statusInactive"), value: "INACTIVE" },
+  ];
+  const SORTS = [
+    { value: "latest" as const, label: t("dash.newestFirst") },
+    { value: "oldest" as const, label: t("dash.oldestFirst") },
+  ];
 
   const params = {
     limit: LIMIT,
@@ -52,21 +59,20 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Recall Feed</h1>
+          <h1 className="text-xl font-bold text-white">{t("dash.title")}</h1>
           {data?.updated_at && (
-            <p className="text-xs text-gray-400 mt-0.5">
-              Updated {new Date(data.updated_at).toLocaleString()}
+            <p className="text-xs text-slate-500 mt-0.5">
+              {t("dash.updated", { date: new Date(data.updated_at).toLocaleString() })}
             </p>
           )}
         </div>
         <button
           onClick={() => refresh.mutate()}
           disabled={refresh.isPending}
-          className="flex items-center gap-1.5 text-sm bg-primary text-white px-3 py-2 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-60"
-          aria-label="Refresh recalls"
+          className="flex items-center gap-1.5 text-sm bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-60 font-medium"
+          aria-label={t("dash.refresh")}
         >
-          <span aria-hidden="true">{refresh.isPending ? "⏳" : "🔄"}</span>
-          Refresh
+          {refresh.isPending ? t("dash.refreshing") : t("dash.refresh")}
         </button>
       </div>
 
@@ -74,13 +80,13 @@ export default function Dashboard() {
       {stats && (
         <div className="grid grid-cols-3 gap-3 mb-5">
           {[
-            { label: "Total Recalls", value: stats.total_recalls, color: "text-gray-700" },
-            { label: "Active", value: stats.active_recalls, color: "text-red-600" },
-            { label: "My Pantry", value: stats.pantry_items, color: "text-blue-600" },
+            { label: t("dash.totalRecalls"), value: stats.total_recalls, color: "text-white" },
+            { label: t("dash.active"), value: stats.active_recalls, color: "text-red-400" },
+            { label: t("dash.myPantry"), value: stats.pantry_items, color: "text-primary-light" },
           ].map((s) => (
-            <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-3 text-center">
+            <div key={s.label} className="bg-navy-800 rounded-xl border border-navy-700 p-3 text-center">
               <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
@@ -94,7 +100,7 @@ export default function Dashboard() {
               key={s}
               onClick={() => { setSource(s); setOffset(0); }}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors
-                ${source === s ? "bg-primary text-white" : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300"}`}
+                ${source === s ? "bg-primary text-white" : "bg-navy-800 text-slate-400 border border-navy-700 hover:border-navy-600 hover:text-white"}`}
             >
               {s}
             </button>
@@ -103,12 +109,12 @@ export default function Dashboard() {
         <div className="flex gap-1">
           {STATUSES.map((s) => (
             <button
-              key={s}
-              onClick={() => { setStatus(s); setOffset(0); }}
+              key={s.value}
+              onClick={() => { setStatus(s.value); setOffset(0); }}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors
-                ${status === s ? "bg-gray-800 text-white" : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300"}`}
+                ${status === s.value ? "bg-navy-600 text-white" : "bg-navy-800 text-slate-400 border border-navy-700 hover:border-navy-600 hover:text-white"}`}
             >
-              {s}
+              {s.label}
             </button>
           ))}
         </div>
@@ -116,7 +122,7 @@ export default function Dashboard() {
           <select
             value={sort}
             onChange={(e) => { setSort(e.target.value as "latest" | "oldest"); setOffset(0); }}
-            className="text-xs border border-gray-200 rounded-full px-3 py-1.5 bg-white text-gray-600 cursor-pointer hover:border-gray-300 focus:outline-none"
+            className="text-xs border border-navy-700 rounded-full px-3 py-1.5 bg-navy-800 text-slate-400 cursor-pointer hover:border-navy-600 focus:outline-none"
             aria-label="Sort order"
           >
             {SORTS.map((o) => (
@@ -129,16 +135,15 @@ export default function Dashboard() {
       {/* CTA */}
       <button
         onClick={() => navigate("/pantry")}
-        className="w-full mb-5 flex items-center justify-center gap-2 bg-orange-50 border border-orange-200 text-orange-700 font-medium rounded-xl py-3 text-sm hover:bg-orange-100 transition-colors"
+        className="w-full mb-5 flex items-center justify-center gap-2 bg-primary/10 border border-primary/30 text-primary-light font-medium rounded-xl py-3 text-sm hover:bg-primary/15 transition-colors"
       >
-        <span aria-hidden="true">🛒</span>
-        Check My Pantry Against These Recalls
+        {t("dash.checkPantry")}
       </button>
 
       {/* Recall list */}
       {isError && (
-        <div className="text-center py-12 text-red-500">
-          Failed to load recalls. Make sure the API server is running.
+        <div className="text-center py-12 text-red-400">
+          {t("dash.loadFailed")}
         </div>
       )}
 
@@ -147,7 +152,7 @@ export default function Dashboard() {
           {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : recalls.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">No recalls found for these filters.</div>
+        <div className="text-center py-12 text-slate-500">{t("dash.noResults")}</div>
       ) : (
         <>
           <div className="flex flex-col gap-3">
@@ -157,13 +162,13 @@ export default function Dashboard() {
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between mt-6 text-sm text-gray-500">
+          <div className="flex items-center justify-between mt-6 text-sm text-slate-500">
             <button
               onClick={() => setOffset(Math.max(0, offset - LIMIT))}
               disabled={offset === 0}
-              className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40"
+              className="px-3 py-1.5 border border-navy-700 rounded-lg hover:bg-navy-800 hover:text-white transition-colors disabled:opacity-40"
             >
-              ← Prev
+              {t("dash.prev")}
             </button>
             <span>
               {offset + 1}–{Math.min(offset + recalls.length, total)} of {total}
@@ -171,9 +176,9 @@ export default function Dashboard() {
             <button
               onClick={() => setOffset(offset + LIMIT)}
               disabled={offset + LIMIT >= total}
-              className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40"
+              className="px-3 py-1.5 border border-navy-700 rounded-lg hover:bg-navy-800 hover:text-white transition-colors disabled:opacity-40"
             >
-              Next →
+              {t("dash.next")}
             </button>
           </div>
         </>

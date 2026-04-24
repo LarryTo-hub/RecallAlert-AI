@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re as _re
 from typing import Any, Dict, List
 
 from pathlib import Path
@@ -30,6 +31,8 @@ def _get_client() -> genai.Client:
     """Lazy-init the Gemini client so imports succeed without an API key."""
     global _client
     if _client is None:
+        # Re-load .env in case server started before the file existed
+        load_dotenv(_env_path, override=True)
         api_key = os.getenv("GOOGLE_API_KEY", "")
         if not api_key:
             raise RuntimeError("GOOGLE_API_KEY is not set in .env")
@@ -38,6 +41,26 @@ def _get_client() -> genai.Client:
 
 
 # ── Recall parsing ────────────────────────────────────────────────────────
+
+def parse_recall_simple(recall: Dict[str, Any]) -> Dict[str, Any]:
+    """Parse a recall record using only the structured API fields — no Gemini call.
+
+    Used by the polling loop so chat requests are never rate-limited.
+    """
+    raw_desc = recall.get("product_description") or ""
+    clean_desc = _extract_product_name(raw_desc)
+    brands: List[str] = [b for b in [recall.get("brand_name")] if b]
+    lot_codes: List[str] = []
+    if recall.get("code_info"):
+        lot_codes = [recall["code_info"]]
+    return {
+        "products": [clean_desc] if clean_desc else [],
+        "brands": brands,
+        "severity": "medium",
+        "lot_codes": lot_codes,
+        "reason_summary": recall.get("reason_for_recall", ""),
+    }
+
 
 def parse_recall(recall: Dict[str, Any]) -> Dict[str, Any]:
     """Use Gemini to extract structured fields from a raw recall record.
@@ -74,8 +97,12 @@ def parse_recall(recall: Dict[str, Any]) -> Dict[str, Any]:
         if text.endswith("```"):
             text = text[: text.rfind("```")]
         return json.loads(text)
-    except Exception:
-        logger.exception("Gemini parse_recall failed; returning fallback")
+    except Exception as _exc:
+        _msg = str(_exc)
+        if "429" in _msg or "RESOURCE_EXHAUSTED" in _msg:
+            logger.warning("Gemini parse_recall rate-limited (429); using fallback")
+        else:
+            logger.exception("Gemini parse_recall failed; returning fallback")
         return {
             # Use the CLEAN description (no ingredient list) in the fallback
             "products": [clean_desc] if clean_desc else [],
@@ -97,13 +124,40 @@ _MATCH_STOPWORDS = {
 }
 
 
+def _stem(word: str) -> str:
+    """Very light stem: strip trailing 's' so 'meals' matches 'meal'."""
+    return word.rstrip("s") if len(word) > 3 else word
+
+
 def _tokenize(text: str) -> set:
-    """Lowercase-split a string, strip punctuation, remove stopwords & short tokens."""
-    return {
-        w.lower().strip(".,;:'\"()[]")
-        for w in (text or "").split()
-        if len(w) > 2 and w.lower().strip(".,;:'\"()[]") not in _MATCH_STOPWORDS
-    }
+    """Lowercase-split a string, strip punctuation, remove stopwords & short tokens.
+
+    Also adds stemmed variants (trailing 's' stripped) so 'meals' matches 'meal'.
+    """
+    result = set()
+    for w in (text or "").split():
+        tok = w.lower().strip(".,;:'\"()[]")
+        if not tok or len(tok) <= 2 or tok in _MATCH_STOPWORDS:
+            continue
+        result.add(tok)
+        stemmed = _stem(tok)
+        if stemmed != tok and len(stemmed) > 2:
+            result.add(stemmed)
+    return result
+
+
+def _normalize_name(text: str) -> str:
+    """Return a fully-collapsed, stemmed, stopword-free comparison string.
+
+    e.g. 'Ready Meals' → 'readymeal'
+         'readymeal'   → 'readymeal'
+         'ReadyMeals'  → 'readymeal'
+    Used to detect near-identical product names regardless of spacing/casing.
+    """
+    # Split CamelCase so 'ReadyMeals' → 'Ready Meals' before tokenizing
+    spaced = _re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
+    tokens = sorted(_tokenize(spaced))
+    return "".join(_stem(t) for t in tokens)
 
 
 _INGREDIENT_MARKERS = (
@@ -142,10 +196,14 @@ def _candidate_filter(
     """
     # Use only the primary product name portion — strip ingredient lists before tokenizing
     recall_tokens: set = set()
+    recall_norms: set = set()  # collapsed normalized forms for fuzzy matching
     for p in parsed_recall.get("products", []):
-        recall_tokens |= _tokenize(_extract_product_name(p))
+        clean = _extract_product_name(p)
+        recall_tokens |= _tokenize(clean)
+        recall_norms.add(_normalize_name(clean))
     for b in parsed_recall.get("brands", []):
         recall_tokens |= _tokenize(b)
+        recall_norms.add(_normalize_name(b))
 
     recall_brands = {b.lower().strip() for b in parsed_recall.get("brands", []) if b}
     recall_lots = {lc.lower().strip() for lc in parsed_recall.get("lot_codes", []) if lc}
@@ -154,16 +212,12 @@ def _candidate_filter(
     for idx, item in enumerate(pantry_items):
         item_name = item.get("product_name", "")
         item_tokens = _tokenize(item_name)
+        item_norm = _normalize_name(item_name)
         if item.get("brand"):
             item_tokens |= _tokenize(item["brand"])
         item_brand = (item.get("brand") or "").lower().strip()
         item_lot = (item.get("lot_code") or "").lower().strip()
 
-        # Single-token pantry items (bare ingredient names) require a brand or
-        # lot match — a lone generic word overlapping a product name is not
-        # sufficient to be a candidate.
-        item_is_single_word = len(item_tokens) == 1
-        token_overlap = recall_tokens & item_tokens
         brand_match = item_brand and item_brand in recall_brands
         lot_match = item_lot and item_lot in recall_lots
 
@@ -171,18 +225,32 @@ def _candidate_filter(
             candidates.append(idx)
             continue
 
+        # Fuzzy collapsed-name check: "Ready Meals", "Ready Meal", "readymeal",
+        # "ReadyMeals" all collapse to a spaceless lowercase string for comparison.
+        item_spaceless = _re.sub(r"[^a-z0-9]", "", item_name.lower())
+        if item_spaceless and len(item_spaceless) >= 4:
+            for rn in recall_norms:
+                rn_spaceless = _re.sub(r"[^a-z0-9]", "", rn)
+                if item_spaceless in rn_spaceless or rn_spaceless.startswith(item_spaceless) or rn_spaceless.endswith(item_spaceless):
+                    candidates.append(idx)
+                    break
+            else:
+                pass  # fall through to token overlap check below
+            if idx in candidates:
+                continue
+
+        token_overlap = recall_tokens & item_tokens
         if not token_overlap:
             continue
 
-        # Require ≥60% of the pantry item's tokens to match across the recall
-        # product name. A pantry item that shares only one incidental word with
-        # a longer recall name is not a reliable candidate.
+        # Single-token pantry items require overlap with a recall token.
+        item_is_single_word = len(item_tokens) == 1
         item_coverage = len(token_overlap) / len(item_tokens) if item_tokens else 0.0
 
         if item_is_single_word:
-            # Single-word items need a brand or lot match (handled above).
-            pass
-        elif item_coverage >= 0.6:
+            if item_tokens & recall_tokens:
+                candidates.append(idx)
+        elif item_coverage >= 0.5:
             candidates.append(idx)
 
     return candidates
@@ -277,6 +345,7 @@ def match_pantry(
         logger.exception("Gemini match_pantry failed; falling back to deterministic filter")
         # Deterministic fallback: require >=2 token overlap to avoid single-word false positives
         recall_tokens: set = set()
+        recall_brands: set = {b.lower().strip() for b in parsed_recall.get("brands", []) if b}
         for p in parsed_recall.get("products", []):
             recall_tokens |= _tokenize(p)
         for b in parsed_recall.get("brands", []):
@@ -286,7 +355,13 @@ def match_pantry(
             item_tokens = _tokenize(item.get("product_name", ""))
             if item.get("brand"):
                 item_tokens |= _tokenize(item["brand"])
-            if len(recall_tokens & item_tokens) >= 2:
+            item_brand = (item.get("brand") or "").lower().strip()
+            # Single-word pantry entries pass if they match a recall brand.
+            # Multi-word entries require >=2 token overlap to avoid incidental matches.
+            if len(item_tokens) == 1:
+                if item_tokens & recall_brands:
+                    matched.append(item)
+            elif len(recall_tokens & item_tokens) >= 2:
                 matched.append(item)
         return matched
 
@@ -376,3 +451,62 @@ def ocr_receipt(image_bytes: bytes) -> List[Dict[str, str]]:
     except Exception:
         logger.exception("Gemini OCR failed")
         return []
+
+
+# ── Chatbot ───────────────────────────────────────────────────────────────
+
+def chat_with_agent(
+    message: str,
+    pantry_items: List[Dict[str, Any]],
+    recent_recalls: List[Dict[str, Any]],
+) -> str:
+    """Answer a user's food-safety question using Gemini with recall + pantry context.
+
+    Args:
+        message: The user's chat message.
+        pantry_items: List of the user's current pantry items.
+        recent_recalls: A sample of recent recalls for context.
+
+    Returns:
+        A plain-text reply string.
+    """
+    pantry_summary = (
+        "\n".join(
+            f"- {item.get('product_name', 'Unknown')}"
+            + (f" (brand: {item['brand']})" if item.get("brand") else "")
+            for item in pantry_items
+        )
+        if pantry_items
+        else "No items in pantry."
+    )
+
+    recall_summary = (
+        "\n".join(
+            f"- {r.get('product_description', 'Unknown')} | Reason: {r.get('reason_for_recall', 'N/A')} | Status: {r.get('status', 'N/A')}"
+            for r in recent_recalls[:15]
+        )
+        if recent_recalls
+        else "No recent recalls available."
+    )
+
+    prompt = (
+        "You are RecallAlert AI, a helpful food safety assistant. "
+        "You help users understand food recalls and whether their pantry items are affected.\n\n"
+        "Be concise and friendly. Use plain text (no markdown). "
+        "If the user asks about their pantry, use the pantry context below. "
+        "If they ask to list recalls, summarize the recent recalls context below.\n\n"
+        f"User's pantry:\n{pantry_summary}\n\n"
+        f"Recent recalls:\n{recall_summary}\n\n"
+        f"User message: {message}"
+    )
+
+    try:
+        resp = _get_client().models.generate_content(model=_MODEL, contents=prompt)
+        return resp.text.strip()
+    except Exception as _chat_exc:
+        _msg = str(_chat_exc)
+        if "429" in _msg or "RESOURCE_EXHAUSTED" in _msg:
+            logger.warning("Gemini chat rate-limited (429)")
+            return "I'm receiving a lot of requests right now and hit a rate limit. Please wait a few seconds and try again."
+        logger.exception("Gemini chat failed")
+        return "I'm having trouble connecting to my AI backend right now. Please try again in a moment."

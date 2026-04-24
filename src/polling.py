@@ -158,9 +158,11 @@ async def poll_and_alert() -> None:
         logger.info("No registered users yet.")
         return
 
+    import time as _time
     alert_count = 0
     for recall_record, saved_obj in new_recalls:
         parsed = parse_recall(recall_record)
+        _time.sleep(4)  # 15 req/min free-tier limit → space calls 4s apart
 
         for user in users:
             pantry = get_pantry(user.id)

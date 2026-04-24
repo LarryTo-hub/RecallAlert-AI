@@ -12,7 +12,7 @@ services:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: STORE_BACKEND
-        value: firebase
+        value: sqlite
       - key: FIREBASE_CRED_PATH
         sync: false
       - key: ENVIRONMENT
