@@ -1,15 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <!-- Background -->
-  <rect width="100" height="100" rx="22" fill="#0f1729"/>
+  <rect width="100" height="100" rx="22" fill="#060d1f"/>
   <!-- Shield body -->
-  <path d="M50 14 L78 24 L78 50 C78 66 65 78 50 84 C35 78 22 66 22 50 L22 24 Z" fill="#4a7df8"/>
-  <!-- Shield highlight -->
-  <path d="M50 14 L78 24 L78 50 C78 66 65 78 50 84 C35 78 22 66 22 50 L22 24 Z" fill="url(#sg)" opacity="0.18"/>
-  <!-- Exclamation mark -->
-  <rect x="46" y="36" width="8" height="24" rx="4" fill="white"/>
-  <circle cx="50" cy="70" r="4.5" fill="white"/>
+  <path d="M50 12 L80 23 L80 51 C80 68 66 80 50 86 C34 80 20 68 20 51 L20 23 Z" fill="#4a7df8"/>
+  <!-- Shield inner gradient overlay -->
+  <path d="M50 12 L80 23 L80 51 C80 68 66 80 50 86 C34 80 20 68 20 51 L20 23 Z" fill="url(#shieldGrad)" opacity="0.15"/>
+  <!-- Checkmark -->
+  <polyline points="35,51 46,62 65,40" fill="none" stroke="white" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
   <defs>
-    <linearGradient id="sg" x1="50" y1="14" x2="50" y2="84" gradientUnits="userSpaceOnUse">
+    <linearGradient id="shieldGrad" x1="50" y1="12" x2="50" y2="86" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="white"/>
       <stop offset="1" stop-color="white" stop-opacity="0"/>
     </linearGradient>

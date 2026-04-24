@@ -882,68 +882,6 @@ async def root():
     }
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Chat (AI Assistant)
-# ──────────────────────────────────────────────────────────────────────────────
-
-class ChatRequest(BaseModel):
-    message: str = Field(..., min_length=1)
-    user_id: str = ""
-
-
-class ChatResponse(BaseModel):
-    reply: str
-
-
-@app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    """Chat with RecallAlert AI for recall questions and disposal instructions."""
-    try:
-        from src import agent
-        
-        from src.models import get_or_create_user_by_key
-
-        user = get_or_create_user_by_key(request.user_id)
-        message = request.message.strip()
-        
-        # Get user's pantry if registered
-        pantry = []
-        try:
-            from src.models import get_pantry
-            pantry = get_pantry(user.id)
-        except Exception:
-            pass
-        
-        # Build context
-        pantry_str = ""
-        if pantry:
-            items = [f"{getattr(item, 'product_name', '?')}" + 
-                     (f" ({getattr(item, 'brand', '')})" if getattr(item, 'brand', None) else "") 
-                     for item in pantry]
-            pantry_str = f"\nUser's pantry items: {', '.join(items)}"
-        
-        # Generate response
-        prompt = (
-            "You are RecallAlert AI, a friendly food safety assistant. "
-            "Answer user questions about food recalls, disposal instructions, "
-            "food safety, and whether their pantry items might be affected.\n"
-            "Be concise (1-3 sentences), practical, and reassuring.\n"
-            f"{pantry_str}\n\n"
-            f"User: {message}"
-        )
-        
-        resp = agent._get_client().models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt
-        )
-        reply = resp.text.strip()
-        
-        return ChatResponse(reply=reply)
-    except Exception as e:
-        logger.exception("Chat error: %s", e)
-        return ChatResponse(reply="Sorry, I'm having trouble responding right now. Please try again later.")
-
-
 @app.get("/stats", response_model=StatsResponse)
 async def get_stats(user_id: str = Query("")):
     """Get user statistics."""
