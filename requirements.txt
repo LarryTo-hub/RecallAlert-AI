@@ -3,6 +3,7 @@ feedparser
 beautifulsoup4
 python-dotenv
 sqlmodel
+psycopg2-binary
 firebase-admin
 google-genai
 Pillow
