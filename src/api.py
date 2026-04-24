@@ -1066,3 +1066,11 @@ async def api_save_notification_settings(
     user_id: str = Query("")
 ):
     return await save_notification_settings(body, user_id)
+
+@app.post("/api/chat")
+async def api_chat_endpoint(body: ChatRequest):
+    return await chat_endpoint(body)
+
+@app.post("/api/ocr")
+async def api_ocr_receipt_endpoint(file: UploadFile = File(...)):
+    return await ocr_receipt_endpoint(file)
