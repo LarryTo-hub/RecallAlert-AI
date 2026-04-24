@@ -1041,3 +1041,28 @@ async def api_add_pantry_item(item: PantryItemRequest, user_id: str = Query(""))
 @app.post("/api/fetch")
 async def api_trigger_fetch():
     return await trigger_fetch()
+
+@app.get("/api/notifications/email", response_model=EmailSettings)
+async def api_get_email_settings(user_id: str = Query("")):
+    return await get_email_settings(user_id)
+
+
+@app.post("/api/notifications/email")
+async def api_save_email_settings(
+    settings: EmailSettingsUpdate,
+    user_id: str = Query("")
+):
+    return await save_email_settings(settings, user_id)
+
+
+@app.get("/api/notifications/settings", response_model=NotificationSettingsResponse)
+async def api_get_notification_settings(user_id: str = Query("")):
+    return await get_notification_settings(user_id)
+
+
+@app.post("/api/notifications/settings")
+async def api_save_notification_settings(
+    body: dict,
+    user_id: str = Query("")
+):
+    return await save_notification_settings(body, user_id)
