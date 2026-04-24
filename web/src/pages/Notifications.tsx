@@ -29,7 +29,9 @@ const SOURCES = [
 
 export default function Notifications() {
   const { t } = useTranslation();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(
+    () => localStorage.getItem("saved_email") ?? ""
+  );
   const [notifyNewOnly, setNotifyNewOnly] = useState(true);
   const [language, setLanguage] = useState(
     () => localStorage.getItem("language") ?? "en"
@@ -53,7 +55,10 @@ export default function Notifications() {
   });
 
   useEffect(() => {
-    if (emailData?.email) setEmail(emailData.email);
+    if (emailData?.email) {
+      setEmail(emailData.email);
+      localStorage.setItem("saved_email", emailData.email);
+    }
     if (emailData?.notify_new_only !== undefined) setNotifyNewOnly(emailData.notify_new_only);
   }, [emailData]);
 
@@ -71,6 +76,7 @@ export default function Notifications() {
       localStorage.setItem("language", language);
       localStorage.setItem("severity_threshold", threshold);
       localStorage.setItem("sources", sources);
+      localStorage.setItem("saved_email", email);
       showToast(t("notif.saved"));
     },
     onError: (e: Error) => showToast(t("notif.saveFailed", { error: e.message }), false),
@@ -107,6 +113,11 @@ export default function Notifications() {
           onChange={(e) => setEmail(e.target.value)}
           className="w-full border border-navy-700 bg-navy-900 text-white placeholder-slate-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
+        {localStorage.getItem("saved_email") && (
+          <p className="mt-1.5 text-xs text-emerald-400">
+            ✓ Saved: {localStorage.getItem("saved_email")}
+          </p>
+        )}
       </section>
 
       {/* Email preference */}
