@@ -9,8 +9,9 @@ interface Props {
 
 const statusColors: Record<string, string> = {
   ACTIVE: "text-red-400",
-  CLOSED: "text-slate-500",
+  CLOSED: "text-emerald-400",
   TERMINATED: "text-emerald-400",
+  COMPLETED: "text-emerald-400",
 };
 
 /** Normalise raw API status values to canonical display labels. */

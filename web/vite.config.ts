@@ -14,7 +14,7 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
         runtimeCaching: [
           {
-            urlPattern: /^\/api\//,
+            urlPattern: /^\/(recalls|pantry|alerts|stats|match|fetch|health|auth|user|notifications|search)(\/|$|\?)/,
             handler: "NetworkFirst",
             options: {
               cacheName: "api-cache",
@@ -31,8 +31,9 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        target: "http://localhost:8001",
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
   },

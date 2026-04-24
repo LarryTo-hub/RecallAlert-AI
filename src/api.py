@@ -176,7 +176,7 @@ app = FastAPI(
 )
 
 # Enable CORS for React frontend
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -402,6 +402,8 @@ async def get_recalls(
             return "ACTIVE"
         upper = value.strip().upper()
         if upper in {"ACTIVE", "CLOSED", "TERMINATED"}:
+            return upper
+        if upper in {"INACTIVE", "RESOLVED", "COMPLETE", "COMPLETED"}:
             return upper
         return value.strip()
 

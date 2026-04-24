@@ -140,6 +140,14 @@ def _status_matches(value: Optional[str], status_filter: Optional[str]) -> bool:
     # Some sources report active recalls as "ONGOING".
     if target == "ACTIVE":
         return normalized in {"ACTIVE", "ONGOING"}
+    # INACTIVE covers all non-active states.
+    if target == "INACTIVE":
+        return normalized in {"CLOSED", "TERMINATED", "COMPLETED"}
+    # Legacy filter support.
+    if target == "RESOLVED":
+        return normalized in {"CLOSED", "TERMINATED"}
+    if target in {"COMPLETE", "COMPLETED"}:
+        return normalized == "COMPLETED"
     return normalized == target
 
 

@@ -6,7 +6,11 @@ import RecallCard from "@/components/RecallCard";
 import { SkeletonCard } from "@/components/Skeleton";
 
 const SOURCES = ["All", "FDA", "USDA"];
-const STATUSES = ["All", "ACTIVE", "CLOSED", "TERMINATED"];
+const STATUSES: Array<{ label: string; value: string }> = [
+  { label: "All", value: "All" },
+  { label: "Active", value: "ACTIVE" },
+  { label: "Inactive", value: "INACTIVE" },
+];
 const SORTS: Array<{ value: "latest" | "oldest"; label: string }> = [
   { value: "latest", label: "Newest first" },
   { value: "oldest", label: "Oldest first" },
@@ -102,12 +106,12 @@ export default function Dashboard() {
         <div className="flex gap-1">
           {STATUSES.map((s) => (
             <button
-              key={s}
-              onClick={() => { setStatus(s); setOffset(0); }}
+              key={s.value}
+              onClick={() => { setStatus(s.value); setOffset(0); }}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors
-                ${status === s ? "bg-navy-600 text-white" : "bg-navy-800 text-slate-400 border border-navy-700 hover:border-navy-600 hover:text-white"}`}
+                ${status === s.value ? "bg-navy-600 text-white" : "bg-navy-800 text-slate-400 border border-navy-700 hover:border-navy-600 hover:text-white"}`}
             >
-              {s}
+              {s.label}
             </button>
           ))}
         </div>
