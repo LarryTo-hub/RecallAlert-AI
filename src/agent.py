@@ -31,6 +31,8 @@ def _get_client() -> genai.Client:
     """Lazy-init the Gemini client so imports succeed without an API key."""
     global _client
     if _client is None:
+        # Re-load .env in case server started before the file existed
+        load_dotenv(_env_path, override=True)
         api_key = os.getenv("GOOGLE_API_KEY", "")
         if not api_key:
             raise RuntimeError("GOOGLE_API_KEY is not set in .env")
@@ -39,6 +41,26 @@ def _get_client() -> genai.Client:
 
 
 # ── Recall parsing ────────────────────────────────────────────────────────
+
+def parse_recall_simple(recall: Dict[str, Any]) -> Dict[str, Any]:
+    """Parse a recall record using only the structured API fields — no Gemini call.
+
+    Used by the polling loop so chat requests are never rate-limited.
+    """
+    raw_desc = recall.get("product_description") or ""
+    clean_desc = _extract_product_name(raw_desc)
+    brands: List[str] = [b for b in [recall.get("brand_name")] if b]
+    lot_codes: List[str] = []
+    if recall.get("code_info"):
+        lot_codes = [recall["code_info"]]
+    return {
+        "products": [clean_desc] if clean_desc else [],
+        "brands": brands,
+        "severity": "medium",
+        "lot_codes": lot_codes,
+        "reason_summary": recall.get("reason_for_recall", ""),
+    }
+
 
 def parse_recall(recall: Dict[str, Any]) -> Dict[str, Any]:
     """Use Gemini to extract structured fields from a raw recall record.
@@ -75,8 +97,12 @@ def parse_recall(recall: Dict[str, Any]) -> Dict[str, Any]:
         if text.endswith("```"):
             text = text[: text.rfind("```")]
         return json.loads(text)
-    except Exception:
-        logger.exception("Gemini parse_recall failed; returning fallback")
+    except Exception as _exc:
+        _msg = str(_exc)
+        if "429" in _msg or "RESOURCE_EXHAUSTED" in _msg:
+            logger.warning("Gemini parse_recall rate-limited (429); using fallback")
+        else:
+            logger.exception("Gemini parse_recall failed; returning fallback")
         return {
             # Use the CLEAN description (no ingredient list) in the fallback
             "products": [clean_desc] if clean_desc else [],
@@ -477,6 +503,10 @@ def chat_with_agent(
     try:
         resp = _get_client().models.generate_content(model=_MODEL, contents=prompt)
         return resp.text.strip()
-    except Exception:
+    except Exception as _chat_exc:
+        _msg = str(_chat_exc)
+        if "429" in _msg or "RESOURCE_EXHAUSTED" in _msg:
+            logger.warning("Gemini chat rate-limited (429)")
+            return "I'm receiving a lot of requests right now and hit a rate limit. Please wait a few seconds and try again."
         logger.exception("Gemini chat failed")
         return "I'm having trouble connecting to my AI backend right now. Please try again in a moment."
