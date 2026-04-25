@@ -15,6 +15,7 @@ export default function Pantry() {
   const [ocrItems, setOcrItems] = useState<(OcrItem & { checked: boolean })[]>([]);
   const [ocrPreview, setOcrPreview] = useState<string | null>(null);
   const [matches, setMatches] = useState<MatchResult[] | null>(null);
+  const [closedMatches, setClosedMatches] = useState<MatchResult[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -65,7 +66,10 @@ export default function Pantry() {
 
   const matchMutation = useMutation({
     mutationFn: matchPantry,
-    onSuccess: ({ matches: m }) => setMatches(m),
+    onSuccess: ({ matches: m, closed_matches: cm }) => {
+      setMatches(m);
+      setClosedMatches(cm ?? []);
+    },
     onError: (e: Error) => showToast(t("pantry.matchFailed", { msg: e.message })),
   });
 
@@ -255,16 +259,18 @@ export default function Pantry() {
         </button>
       </div>
 
-      {/* Match results */}
+      {/* Active match results */}
       {matches !== null && (
         <section className="bg-navy-800 border border-navy-700 rounded-xl p-4 mb-4">
           <h2 className="font-semibold text-sm text-slate-300 mb-2">
-            {matches.length === 0
+            {matches.length === 0 && closedMatches.length === 0
               ? t("pantry.noMatchFound")
+              : matches.length === 0
+              ? t("pantry.noActiveMatches")
               : t("pantry.matchesFound", { n: String(matches.length) })}
           </h2>
           {matches.map((m, i) => (
-            <div key={i} className="bg-navy-900 rounded-lg border border-navy-700 p-3 mb-2">
+            <div key={i} className="bg-navy-900 rounded-lg border border-red-900/40 p-3 mb-2">
               <div className="flex items-center gap-2 mb-1">
                 <SeverityBadge severity={m.parsed.severity} />
                 <span className="text-sm font-medium text-white line-clamp-1">
@@ -273,10 +279,44 @@ export default function Pantry() {
               </div>
               <p className="text-xs text-slate-400 mb-1">{m.parsed.reason_summary}</p>
               <p className="text-xs text-primary-light">
-                {t("pantry.yourItems")}: {m.matched_items.map((it) => it.product_name).join(", ")}
+                {t("pantry.yourItems", { items: m.matched_items.map((it) => it.brand ? `${it.brand} ${it.product_name}` : it.product_name).join(", ") })}
               </p>
             </div>
           ))}
+        </section>
+      )}
+
+      {/* Closed/terminated recall history */}
+      {closedMatches.length > 0 && (
+        <section className="bg-navy-800 border border-navy-700 rounded-xl p-4 mb-4">
+          <h2 className="font-semibold text-sm text-slate-400 mb-1">
+            {t("pantry.closedRecallsTitle")}
+          </h2>
+          <p className="text-xs text-slate-500 mb-3">{t("pantry.closedRecallsHint")}</p>
+          {closedMatches.map((m, i) => {
+            const refDate = m.recall.recall_initiation_date || m.recall.report_date;
+            return (
+              <div key={i} className="bg-navy-900 rounded-lg border border-navy-700 p-3 mb-2 opacity-80">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">
+                    {t("pantry.recallClosed")}
+                  </span>
+                  <span className="text-sm font-medium text-slate-300 line-clamp-1">
+                    {m.recall.product_description}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mb-1">{m.parsed.reason_summary}</p>
+                <p className="text-xs text-amber-400/80">
+                  {refDate
+                    ? t("pantry.discardIfBefore", { date: refDate })
+                    : t("pantry.discardIfPurchased")}
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {t("pantry.yourItems", { items: m.matched_items.map((it) => it.brand ? `${it.brand} ${it.product_name}` : it.product_name).join(", ") })}
+                </p>
+              </div>
+            );
+          })}
         </section>
       )}
 

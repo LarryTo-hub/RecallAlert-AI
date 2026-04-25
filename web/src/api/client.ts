@@ -1,8 +1,8 @@
 /** Typed API client for the RecallAlert FastAPI backend. */
 
 const BASE =
-  import.meta.env.VITE_API_URL ??
-  (window.location.hostname === "localhost" ? "http://localhost:8001" : "");
+  import.meta.env.VITE_API_URL ||
+  (window.location.hostname === "localhost" ? "http://localhost:8080" : "");
 
 /** Returns a persistent anonymous user ID (UUID) stored in localStorage. */
 export function getUserId(): string {
@@ -155,7 +155,7 @@ export async function ocrReceipt(file: File): Promise<{ items: OcrItem[] }> {
 
 // ── Match ──────────────────────────────────────────────────────────────────
 
-export async function matchPantry(): Promise<{ matches: MatchResult[] }> {
+export async function matchPantry(): Promise<{ matches: MatchResult[]; closed_matches: MatchResult[] }> {
   return request(`/api/match?user_id=${getUserId()}`, { method: "POST" });
 }
 

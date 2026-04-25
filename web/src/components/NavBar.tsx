@@ -26,13 +26,6 @@ function AlertIcon() {
     </svg>
   );
 }
-function SearchIcon() {
-  return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-  );
-}
 function MailIcon() {
   return (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
@@ -60,7 +53,6 @@ const links = [
   { to: "/dashboard", label: "nav.dashboard", Icon: HomeIcon },
   { to: "/pantry",    label: "nav.pantry",    Icon: PantryIcon },
   { to: "/alerts",   label: "nav.alerts",    Icon: AlertIcon },
-  { to: "/search",   label: "nav.search",    Icon: SearchIcon },
   { to: "/notifications", label: "nav.notify", Icon: MailIcon },
   { to: "/settings", label: "nav.settings",  Icon: CogIcon },
 ];

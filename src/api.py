@@ -389,7 +389,7 @@ async def get_recalls(
     source: Optional[str] = None,
     status: Optional[str] = None,
     q: Optional[str] = None,
-    sort: str = Query("latest", regex="^(latest|oldest)$"),
+    sort: str = Query("latest", pattern="^(latest|oldest)$"),
 ):
     """Get paginated recalls. ``sort`` accepts ``latest`` (default) or ``oldest``."""
     from src.store import get_all_recalls, get_recall_count, get_cache_updated_at
@@ -408,12 +408,33 @@ async def get_recalls(
         return value.strip()
 
     def normalize_date(value: Optional[str]) -> Optional[str]:
+        """Normalize any date string to YYYY-MM-DD.  Handles:
+        YYYYMMDD, YYYY-MM-DD (already good), MM/DD/YYYY, M/D/YYYY,
+        Month DD YYYY, Month DD, YYYY."""
         if not value:
             return value
         text = value.strip()
+        # Already ISO: YYYY-MM-DD
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+            return text
+        # Compact: YYYYMMDD
         m = re.fullmatch(r"(\d{4})(\d{2})(\d{2})", text)
         if m:
-            return f"{m.group(2)}/{m.group(3)}/{m.group(1)}"
+            return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+        # US: MM/DD/YYYY or M/D/YYYY
+        m = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", text)
+        if m:
+            return f"{m.group(3)}-{m.group(1).zfill(2)}-{m.group(2).zfill(2)}"
+        # Month name: "January 22, 2015" or "January 22 2015"
+        try:
+            from datetime import datetime as _dt
+            for fmt in ("%B %d, %Y", "%B %d %Y", "%b %d, %Y", "%b %d %Y"):
+                try:
+                    return _dt.strptime(text, fmt).strftime("%Y-%m-%d")
+                except ValueError:
+                    pass
+        except Exception:
+            pass
         return text
 
     recalls = get_all_recalls(skip=offset, limit=limit, source=source, status=status, q=q, sort=sort)
@@ -463,7 +484,7 @@ async def match_pantry(user_id: str = Query("")):
     user = get_or_create_user_by_key(user_id)
     pantry = get_pantry(user.id)
     if not pantry:
-        return {"matches": []}
+        return {"matches": [], "closed_matches": []}
 
     pantry_dicts = [
         {
@@ -474,28 +495,104 @@ async def match_pantry(user_id: str = Query("")):
         for p in pantry
     ]
 
-    # Gather likely candidate recalls by querying each pantry product term.
-    # If no candidates are found, fall back to the most recent recalls.
-    candidates = []
-    seen = set()
-    for item in pantry_dicts:
-        term = (item.get("product_name") or "").strip()
-        if not term:
-            continue
+    # Gather candidate recalls:
+    # 1. Per-item text search by product name AND brand — finds product-specific recalls.
+    # 2. Always also include the 100 most-recent recalls so active recalls
+    #    for items not matched by a keyword search are never skipped.
+    seen: set = set()
+    candidates: List[dict] = []
 
-        for recall in get_all_recalls(skip=0, limit=200, q=term):
-            key = (
-                recall.get("recall_number") or "",
-                recall.get("product_description") or "",
-                recall.get("report_date") or "",
-            )
-            if key in seen:
-                continue
+    def _add_recall(recall: dict) -> None:
+        key = (
+            recall.get("recall_number") or "",
+            recall.get("product_description") or "",
+            recall.get("report_date") or "",
+        )
+        if key not in seen:
             seen.add(key)
             candidates.append(recall)
 
-    if not candidates:
-        candidates = get_all_recalls(skip=0, limit=300)
+    for item in pantry_dicts:
+        term = (item.get("product_name") or "").strip()
+        brand = (item.get("brand") or "").strip()
+        # Search by product name alone
+        if term:
+            for recall in get_all_recalls(skip=0, limit=50, q=term):
+                _add_recall(recall)
+        # Search by brand + product name combined so generic store brands ("Great Value",
+        # "Kirkland") don't pull in every recall from that brand — they need a product hit too.
+        if brand and term:
+            for recall in get_all_recalls(skip=0, limit=50, q=f"{brand} {term}"):
+                _add_recall(recall)
+        elif brand:
+            # No product name — search brand alone as last resort
+            for recall in get_all_recalls(skip=0, limit=50, q=brand):
+                _add_recall(recall)
+
+    # Always merge the most-recent 100 active recalls so no current recall
+    # is missed just because a pantry item keyword didn't match its DB text.
+    for recall in get_all_recalls(skip=0, limit=100, status="active"):
+        _add_recall(recall)
+
+    def _raw_prefilter(recall: dict, pantry_items: List[dict]) -> bool:
+        """Fast token check on raw DB fields — no Gemini. Skip obvious mismatches
+        before paying the cost of parse_recall."""
+        import re as _rp
+        from src.agent import _extract_product_name, _tokenize
+        prod = _extract_product_name(str(recall.get("product_description") or ""))
+        brand = str(recall.get("brand_name") or "")
+        prod_spaced = _rp.sub(r"([a-z])([A-Z])", r"\1 \2", prod)
+        brand_spaced = _rp.sub(r"([a-z])([A-Z])", r"\1 \2", brand)
+        # Product-only tokens (no brand) and combined tokens for different checks
+        recall_prod_tokens = _tokenize(prod_spaced)
+        recall_tokens = recall_prod_tokens | _tokenize(brand_spaced)
+        recall_spaceless = _rp.sub(r"[^a-z0-9]", "", (prod_spaced + " " + brand_spaced).lower())
+        recall_brand_lower = brand.lower().strip()
+        for item in pantry_items:
+            name = str(item.get("product_name") or "")
+            item_brand = str(item.get("brand") or "").lower().strip()
+            item_lot = str(item.get("lot_code") or "").lower().strip()
+            name_spaced = _rp.sub(r"([a-z])([A-Z])", r"\1 \2", name)
+            item_tokens = _tokenize(name_spaced)
+            # Strip the brand word from item tokens so overlap only counts product words
+            item_brand_tokens = _tokenize(item_brand)
+            item_prod_tokens = item_tokens - item_brand_tokens
+            item_spaceless = _rp.sub(r"[^a-z0-9]", "", name.lower())
+            # Lot code exact match — check reason_for_recall and product_description
+            if item_lot:
+                recall_text = (
+                    str(recall.get("reason_for_recall") or "") + " " +
+                    str(recall.get("product_description") or "")
+                ).lower()
+                if item_lot in recall_text:
+                    return True
+            # Brand match + product-word overlap — excludes brand tokens from the
+            # overlap so "Kraft" alone doesn't satisfy the overlap test for every Kraft recall.
+            if item_brand and recall_brand_lower and item_brand == recall_brand_lower:
+                if item_prod_tokens and (recall_prod_tokens & item_prod_tokens):
+                    return True
+            # Spaceless bidirectional substring — only for multi-word items.
+            # Single words like "butter" would falsely match "buttermilk" or
+            # "apples" would match "pineapplesorbet" due to accidental substring hits
+            # when spaces are removed.
+            if len(item_prod_tokens) >= 2:
+                item_name_spaceless = _rp.sub(r"[^a-z0-9]", "", name.lower().replace(item_brand, "").strip())
+                recall_prod_spaceless = _rp.sub(r"[^a-z0-9]", "", prod_spaced.lower())
+                if item_name_spaceless and len(item_name_spaceless) >= 4 and (
+                    item_name_spaceless in recall_prod_spaceless or recall_prod_spaceless in item_name_spaceless
+                ):
+                    return True
+                # Full spaceless check (includes brand) — kept as fallback
+                if item_spaceless and len(item_spaceless) >= 5 and (
+                    item_spaceless in recall_spaceless or recall_spaceless in item_spaceless
+                ):
+                    return True
+            # Product-word token overlap — require ≥2 matching non-brand tokens
+            # so a single shared word like "cheese" doesn't match everything
+            prod_overlap = recall_prod_tokens & item_prod_tokens
+            if len(prod_overlap) >= 2:
+                return True
+        return False
 
     def deterministic_match(recall: dict, pantry_items: List[dict]) -> List[dict]:
         """Fallback matcher for obvious product-name matches missed by the LLM.
@@ -505,12 +602,20 @@ async def match_pantry(user_id: str = Query("")):
         brand, so it cannot re-introduce ingredient-based false positives.
         """
         from src.agent import _extract_product_name, _tokenize, _normalize_name
+        import re as _re2
 
         # Build a clean search text from structural fields only — NO ingredient lists.
+        # CamelCase-split so "ReadyMeal" → "Ready Meal" before tokenizing.
         clean_desc = _extract_product_name(str(recall.get("product_description") or ""))
         brand_name = str(recall.get("brand_name") or "")
-        clean_text = (clean_desc + " " + brand_name).lower()
+        clean_desc_spaced = _re2.sub(r"([a-z])([A-Z])", r"\1 \2", clean_desc)
+        brand_name_spaced = _re2.sub(r"([a-z])([A-Z])", r"\1 \2", brand_name)
+        clean_text = (clean_desc_spaced + " " + brand_name_spaced).lower()
         recall_norm = _normalize_name(clean_desc + " " + brand_name)
+        recall_spaceless = _re2.sub(r"[^a-z0-9]", "", clean_text)
+        # Product-only tokens for the recall (no brand contamination)
+        recall_prod_tokens = _tokenize(clean_desc_spaced)
+        recall_prod_spaceless = _re2.sub(r"[^a-z0-9]", "", clean_desc_spaced.lower())
 
         matched_items = []
         for item in pantry_items:
@@ -519,53 +624,52 @@ async def match_pantry(user_id: str = Query("")):
             if not name:
                 continue
 
-            item_tokens = _tokenize(name)
+            # CamelCase-split item name too so "ReadyMeal" → "ready meal" tokens
+            name_spaced = _re2.sub(r"([a-z])([A-Z])", r"\1 \2", name)
+            item_tokens = _tokenize(name_spaced)
+            # Strip brand tokens from item so "Kraft" doesn't satisfy product overlap
+            item_brand_tokens = _tokenize(item_brand)
+            item_prod_tokens = item_tokens - item_brand_tokens
             item_norm = _normalize_name(name)
 
             # Skip single-word generic pantry items with no brand — they must
             # pass the LLM stage; the fallback cannot safely distinguish a bare
             # ingredient name from a product named after that ingredient.
-            if len(item_tokens) <= 1 and not item_brand:
+            if len(item_prod_tokens) == 0 and not item_brand:
                 continue
 
             name_lower = name.lower()
-            recall_tokens = _tokenize(clean_text)
+            item_prod_name = name_lower.replace(item_brand, "").strip()
 
-            # Fuzzy collapsed-name check catches "Ready Meal" vs "readymeal".
-            import re as _re2
-            item_spaceless = _re2.sub(r"[^a-z0-9]", "", name_lower)
-            recall_spaceless = _re2.sub(r"[^a-z0-9]", "", clean_text)
-            if item_spaceless and len(item_spaceless) >= 4 and item_spaceless in recall_spaceless:
+            # Coverage ratio: overlap must be on product tokens only, not brand tokens.
+            # This prevents "Kraft Cheddar Sliced" from matching "Kraft Dressing" via brand.
+            #
+            # Threshold is 0.70 (conservative) so this fallback only fires for close
+            # product-name matches that Gemini missed.  Lower-confidence matches should
+            # be handled by Gemini, not overridden here.  This also prevents
+            # "Peanut Butter" (2 tokens, 50%) from matching "Peanut Butter ice cream"
+            # (4 tokens) where Gemini correctly said "no".
+            MIN_RECALL_COVERAGE = 0.70
+            prod_overlap = len(item_prod_tokens & recall_prod_tokens)
+            coverage = prod_overlap / len(recall_prod_tokens) if recall_prod_tokens else 0.0
+
+            # Secondary signal: ≥2 overlapping product tokens with high coverage.
+            if prod_overlap >= 2 and coverage >= MIN_RECALL_COVERAGE:
                 matched_items.append(item)
                 continue
 
-            # Coverage ratio: the pantry item's overlapping tokens must account
-            # for ≥40% of the recall's product-name tokens. A pantry item that
-            # shares only one or two incidental words with a longer product name
-            # is not a reliable match.
-            MIN_RECALL_COVERAGE = 0.40
-            overlap = len(item_tokens & recall_tokens)
-            coverage = overlap / len(recall_tokens) if recall_tokens else 0.0
-
-            # Strong signal: full pantry product string in clean recall text,
-            # AND the item covers a meaningful share of that text.
-            if name_lower in clean_text and coverage >= MIN_RECALL_COVERAGE:
-                matched_items.append(item)
-                continue
-
-            # Secondary signal: ≥2 overlapping tokens with sufficient coverage.
-            if overlap >= 2 and coverage >= MIN_RECALL_COVERAGE:
-                matched_items.append(item)
-                continue
-
-            # Brand-only signal.
-            if item_brand and item_brand in clean_text:
+            # Brand + product overlap — brand must appear AND product tokens must overlap recall product tokens
+            # (not just recall_tokens which includes brand, causing brand-self-match)
+            if item_brand and item_brand in clean_text and item_prod_tokens and (item_prod_tokens & recall_prod_tokens):
                 matched_items.append(item)
 
         return matched_items
 
     matches = []
     for recall in candidates:
+        # Fast raw-field pre-filter: skip Gemini calls for obvious non-matches
+        if not _raw_prefilter(recall, pantry_dicts):
+            continue
         parsed = parse_recall(recall)
         matched_items = agent_match_pantry(parsed, pantry_dicts)
 
@@ -610,16 +714,24 @@ async def match_pantry(user_id: str = Query("")):
             }
         )
 
-    # Send email if user has one registered and there are matches
-    if matches and user.email:
+    # Split matches into active vs closed/terminated/completed recalls.
+    _inactive = {"CLOSED", "TERMINATED", "COMPLETED"}
+    def _is_active(status: Optional[str]) -> bool:
+        return (status or "").strip().upper() not in _inactive
+
+    active_matches = [m for m in matches if _is_active(m["recall"].get("status"))]
+    closed_matches = [m for m in matches if not _is_active(m["recall"].get("status"))]
+
+    # Only email for active (still-open) recalls.
+    if active_matches and user.email:
         try:
             from src.notifier import send_email_smtp
             matched_products = ", ".join(
-                m["product_name"] for match in matches for m in match["matched_items"]
+                m["product_name"] for match in active_matches for m in match["matched_items"]
             )
-            subject = f"[RecallAlert] {len(matches)} recall(s) matched your pantry"
+            subject = f"[RecallAlert] {len(active_matches)} active recall(s) matched your pantry"
             body = f"The following pantry items matched active recalls:\n\n{matched_products}\n\n"
-            for m in matches:
+            for m in active_matches:
                 recall = m["recall"]
                 body += f"• {recall.get('product_description', 'Unknown')} — {recall.get('reason_for_recall', 'N/A')}\n"
             body += "\nCheck the RecallAlert app for full details."
@@ -628,7 +740,7 @@ async def match_pantry(user_id: str = Query("")):
         except Exception:
             logger.exception("Failed to send match email to %s", user.email)
 
-    return {"matches": matches}
+    return {"matches": active_matches, "closed_matches": closed_matches}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1074,3 +1186,23 @@ async def api_chat_endpoint(body: ChatRequest):
 @app.post("/api/ocr")
 async def api_ocr_receipt_endpoint(file: UploadFile = File(...)):
     return await ocr_receipt_endpoint(file)
+
+@app.post("/api/match")
+async def api_match_pantry(user_id: str = Query("")):
+    return await match_pantry(user_id)
+
+@app.delete("/api/pantry/items/{item_id}")
+async def api_delete_pantry_item(item_id: int, user_id: str = Query("")):
+    return await delete_pantry_item_endpoint(item_id, user_id)
+
+@app.delete("/api/pantry")
+async def api_clear_pantry(user_id: str = Query("")):
+    return await clear_pantry_endpoint(user_id)
+
+@app.get("/api/alerts")
+async def api_get_alerts(user_id: str = Query(""), status: Optional[str] = None):
+    return await get_alerts_endpoint(user_id, status)
+
+@app.patch("/api/alerts/{alert_id}/feedback")
+async def api_update_alert_feedback(alert_id: int, feedback: AlertFeedback, user_id: str = Query("")):
+    return await submit_feedback(alert_id, feedback, user_id)

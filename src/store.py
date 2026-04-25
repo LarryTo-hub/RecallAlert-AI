@@ -159,11 +159,22 @@ def _record_matches(record: Dict[str, Any], source: Optional[str], status: Optio
 
     if q:
         q_lower = q.lower()
-        if (
-            q_lower not in (record.get("product_description") or "").lower()
-            and q_lower not in (record.get("brand_name") or "").lower()
-            and q_lower not in (record.get("reason_for_recall") or "").lower()
-            and q_lower not in (record.get("company_name") or "").lower()
+        # Spaceless fallback: "Ready Meal" matches "ReadyMeal" and vice versa
+        q_spaceless = re.sub(r"[^a-z0-9]", "", q_lower)
+
+        def _field_match(val: Optional[str]) -> bool:
+            fv = (val or "").lower()
+            if q_lower in fv:
+                return True
+            if q_spaceless:
+                return q_spaceless in re.sub(r"[^a-z0-9]", "", fv)
+            return False
+
+        if not (
+            _field_match(record.get("product_description"))
+            or _field_match(record.get("brand_name"))
+            or _field_match(record.get("reason_for_recall"))
+            or _field_match(record.get("company_name"))
         ):
             return False
 
@@ -270,6 +281,9 @@ def _firestore_save_if_new(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 from sqlmodel import SQLModel, Field, create_engine, Session, select  # noqa: E402
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///recalls.db")
+# Render (and some other hosts) issue postgres:// URLs; SQLAlchemy requires postgresql://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 _engine = create_engine(DATABASE_URL, echo=False)
 
 class Recall(SQLModel, table=True):
@@ -382,18 +396,63 @@ def get_all_recalls(
         ordered = sorted(deduped, key=_recall_sort_key, reverse=reverse)
         return ordered[skip: skip + limit]
     else:
-        # For SQLite, filter in Python to keep matching logic identical to Firestore.
         with Session(_engine) as sess:
-            query = select(Recall).order_by(Recall.id.desc())
-            recalls = sess.exec(query).all()
-            all_records = [r.model_dump() for r in recalls]
-            filtered = [
-                r for r in all_records
-                if _record_matches(r, source=source, status=status, q=q)
-            ]
-            deduped = _dedupe_records(filtered)
-            ordered = sorted(deduped, key=_recall_sort_key, reverse=reverse)
-            return ordered[skip: skip + limit]
+            if q:
+                # Text search requires Python-side spaceless/CamelCase matching.
+                # Load only the most recent 5 000 records to bound memory usage.
+                base_stmt = select(Recall).order_by(Recall.id.desc()).limit(5000)
+                recalls = sess.exec(base_stmt).all()
+                all_records = [r.model_dump() for r in recalls]
+                filtered = [
+                    r for r in all_records
+                    if _record_matches(r, source=source, status=status, q=q)
+                ]
+                deduped = _dedupe_records(filtered)
+                ordered = sorted(deduped, key=_recall_sort_key, reverse=reverse)
+                return ordered[skip: skip + limit]
+            else:
+                # No text search — use two-phase query so we can sort by actual
+                # recall date (mixed string formats) in Python without loading
+                # full rows, then fetch only the page's records from SQL.
+                # Phase 1: load lightweight sort/filter columns only.
+                sort_stmt = select(
+                    Recall.id,
+                    Recall.report_date,
+                    Recall.recall_initiation_date,
+                )
+                if source:
+                    src_upper = source.strip().upper()
+                    if src_upper in {"FDA", "USDA"}:
+                        sort_stmt = sort_stmt.where(Recall.source.like(f"{src_upper}%"))
+                    else:
+                        sort_stmt = sort_stmt.where(Recall.source == src_upper)
+                if status:
+                    status_upper = status.strip().upper()
+                    if status_upper == "ACTIVE":
+                        sort_stmt = sort_stmt.where(Recall.status.in_(["ACTIVE", "ONGOING"]))
+                    elif status_upper == "INACTIVE":
+                        sort_stmt = sort_stmt.where(Recall.status.in_(["CLOSED", "TERMINATED", "COMPLETED"]))
+                    else:
+                        sort_stmt = sort_stmt.where(Recall.status == status_upper)
+                rows = sess.exec(sort_stmt).all()
+                # Sort by parsed recall date in Python (handles all mixed formats).
+                rows_sorted = sorted(
+                    rows,
+                    key=lambda r: (
+                        _parse_recall_date(r[1]) or _parse_recall_date(r[2]) or datetime.min,
+                        r[0],
+                    ),
+                    reverse=reverse,
+                )
+                page_ids = [r[0] for r in rows_sorted[skip: skip + limit]]
+                if not page_ids:
+                    return []
+                # Phase 2: fetch full records for this page only.
+                full_recalls = sess.exec(
+                    select(Recall).where(Recall.id.in_(page_ids))
+                ).all()
+                id_to_record = {r.id: r.model_dump() for r in full_recalls}
+                return [id_to_record[pid] for pid in page_ids if pid in id_to_record]
 
 
 def get_recall_by_id(recall_id: int) -> Optional[dict]:
@@ -435,17 +494,42 @@ def get_recall_count(
         query = _firestore_client.collection("recalls")
         docs = query.stream()
         all_records = [doc.to_dict() for doc in docs]
+        filtered = [
+            r for r in all_records
+            if _record_matches(r, source=source, status=status, q=q)
+        ]
+        return len(_dedupe_records(filtered))
     else:
-        with Session(_engine) as sess:
-            query = select(Recall).order_by(Recall.id.desc())
-            recalls = sess.exec(query).all()
-            all_records = [r.model_dump() for r in recalls]
-
-    filtered = [
-        r for r in all_records
-        if _record_matches(r, source=source, status=status, q=q)
-    ]
-    return len(_dedupe_records(filtered))
+        if q:
+            # Text search still needs Python-side matching.
+            with Session(_engine) as sess:
+                recalls = sess.exec(select(Recall).order_by(Recall.id.desc()).limit(5000)).all()
+                all_records = [r.model_dump() for r in recalls]
+                filtered = [
+                    r for r in all_records
+                    if _record_matches(r, source=source, status=status, q=q)
+                ]
+                return len(_dedupe_records(filtered))
+        else:
+            # No text search — use SQL COUNT.
+            from sqlalchemy import func as sqla_func
+            with Session(_engine) as sess:
+                count_stmt = select(sqla_func.count()).select_from(Recall)
+                if source:
+                    src_upper = source.strip().upper()
+                    if src_upper in {"FDA", "USDA"}:
+                        count_stmt = count_stmt.where(Recall.source.like(f"{src_upper}%"))
+                    else:
+                        count_stmt = count_stmt.where(Recall.source == src_upper)
+                if status:
+                    status_upper = status.strip().upper()
+                    if status_upper == "ACTIVE":
+                        count_stmt = count_stmt.where(Recall.status.in_(["ACTIVE", "ONGOING"]))
+                    elif status_upper == "INACTIVE":
+                        count_stmt = count_stmt.where(Recall.status.in_(["CLOSED", "TERMINATED", "COMPLETED"]))
+                    else:
+                        count_stmt = count_stmt.where(Recall.status == status_upper)
+                return sess.exec(count_stmt).one()
 
 
 def get_cache_updated_at() -> Optional[str]:

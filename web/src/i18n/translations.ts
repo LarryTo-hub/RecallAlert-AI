@@ -11,6 +11,7 @@ export interface Strings {
     newestFirst: string; oldestFirst: string;
     statusAll: string; statusActive: string; statusInactive: string;
     checkPantry: string; loadFailed: string; noResults: string;
+    searchPlaceholder: string;
     prev: string; next: string;
   };
   pantry: {
@@ -19,10 +20,12 @@ export interface Strings {
     scanReceipt: string; uploadHint: string; scanningReceipt: string;
     reviewItems: string; addSelected: string;
     checkRecalls: string; checking: string; exportCsv: string; clear: string;
-    clearConfirm: string; noMatchFound: string; matchesFound: string;
+    clearConfirm: string; noMatchFound: string; matchesFound: string; noActiveMatches: string;
     yourItems: string; itemsCount: string; noItems: string; lot: string;
     itemAdded: string; cleared: string; ocrFailed: string;
     matchFailed: string; addedFromReceipt: string;
+    closedRecallsTitle: string; closedRecallsHint: string;
+    recallClosed: string; discardIfBefore: string; discardIfPurchased: string;
   };
   alerts: {
     title: string; total: string; disposed: string; ignored: string;
@@ -72,6 +75,7 @@ const en: Strings = {
     newestFirst: "Newest first", oldestFirst: "Oldest first",
     statusAll: "All", statusActive: "Active", statusInactive: "Inactive",
     checkPantry: "Check My Pantry Against These Recalls",
+    searchPlaceholder: "Search recalls by product, brand, or reason…",
     loadFailed: "The server is warming up — this can take up to a minute. Please refresh in a moment.",
     noResults: "No recalls found for these filters.",
     prev: "← Prev", next: "Next →",
@@ -89,7 +93,8 @@ const en: Strings = {
     exportCsv: "Export CSV", clear: "Clear",
     clearConfirm: "Clear all {n} pantry items?",
     noMatchFound: "No matches found — your pantry looks safe.",
-    matchesFound: "{n} potential match(es) found",
+    noActiveMatches: "No active recalls matched — see below for closed recalls.",
+    matchesFound: "{n} active recall match(es) found",
     yourItems: "Your items: {items}",
     itemsCount: "Items ({n})",
     noItems: "No items yet. Add products manually or scan a receipt.",
@@ -97,6 +102,11 @@ const en: Strings = {
     itemAdded: "Item added to pantry", cleared: "Pantry cleared",
     ocrFailed: "OCR failed: {error}", matchFailed: "Match failed: {error}",
     addedFromReceipt: "Added {n} items from receipt",
+    closedRecallsTitle: "Previously Recalled Products",
+    closedRecallsHint: "These recalls have been closed or terminated. If you purchased any of the matched products before the recall ended, please discard them.",
+    recallClosed: "Recall Closed",
+    discardIfBefore: "Discard if purchased before {date}",
+    discardIfPurchased: "Discard any units purchased during the recall period.",
   },
   alerts: {
     title: "Alert History", total: "Total Alerts",
@@ -174,6 +184,7 @@ const es: Strings = {
     newestFirst: "Más recientes primero", oldestFirst: "Más antiguos primero",
     statusAll: "Todos", statusActive: "Activo", statusInactive: "Inactivo",
     checkPantry: "Verificar Mi Despensa Contra Estos Retiros",
+    searchPlaceholder: "Buscar retiros por producto, marca o razón…",
     loadFailed: "El servidor está iniciando — esto puede tardar hasta un minuto. Por favor, recarga en un momento.",
     noResults: "No se encontraron retiros para estos filtros.",
     prev: "← Anterior", next: "Siguiente →",
@@ -191,7 +202,8 @@ const es: Strings = {
     exportCsv: "Exportar CSV", clear: "Limpiar",
     clearConfirm: "¿Limpiar todos los {n} artículos de la despensa?",
     noMatchFound: "No se encontraron coincidencias — su despensa parece segura.",
-    matchesFound: "{n} posible(s) coincidencia(s) encontrada(s)",
+    noActiveMatches: "Sin retiros activos — vea abajo los retiros cerrados.",
+    matchesFound: "Se encontraron {n} retiro(s) activo(s)",
     yourItems: "Sus artículos: {items}",
     itemsCount: "Artículos ({n})",
     noItems: "Sin artículos aún. Agregue productos manualmente o escanee un recibo.",
@@ -199,6 +211,11 @@ const es: Strings = {
     itemAdded: "Artículo agregado a la despensa", cleared: "Despensa vaciada",
     ocrFailed: "Fallo en OCR: {error}", matchFailed: "Fallo en verificación: {error}",
     addedFromReceipt: "Se agregaron {n} artículos del recibo",
+    closedRecallsTitle: "Productos Anteriormente Retirados",
+    closedRecallsHint: "Estos retiros han sido cerrados. Si compró alguno antes de la fecha de cierre, deséchelo.",
+    recallClosed: "Retiro Cerrado",
+    discardIfBefore: "Deseche si lo compró antes de {date}",
+    discardIfPurchased: "Deseche cualquier unidad comprada durante el período de retiro.",
   },
   alerts: {
     title: "Historial de Alertas", total: "Total de Alertas",
@@ -276,6 +293,7 @@ const vi: Strings = {
     newestFirst: "Mới nhất trước", oldestFirst: "Cũ nhất trước",
     statusAll: "Tất cả", statusActive: "Hoạt động", statusInactive: "Không hoạt động",
     checkPantry: "Kiểm tra thực phẩm với danh sách thu hồi",
+    searchPlaceholder: "Tìm kiếm theo sản phẩm, thương hiệu hoặc lý do…",
     loadFailed: "Máy chủ đang khởi động — quá trình này có thể mất đến một phút. Vui lòng làm mới sau giây lát.",
     noResults: "Không tìm thấy thu hồi với các bộ lọc này.",
     prev: "← Trước", next: "Tiếp →",
@@ -293,7 +311,8 @@ const vi: Strings = {
     exportCsv: "Xuất CSV", clear: "Xóa",
     clearConfirm: "Xóa tất cả {n} mặt hàng trong thực phẩm?",
     noMatchFound: "Không tìm thấy kết quả — thực phẩm của bạn có vẻ an toàn.",
-    matchesFound: "Tìm thấy {n} kết quả tiềm năng",
+    noActiveMatches: "Không có thu hồi đang hoạt động — xem bên dưới các thu hồi đã đóng.",
+    matchesFound: "Tìm thấy {n} thu hồi đang hoạt động",
     yourItems: "Các mặt hàng của bạn: {items}",
     itemsCount: "Mặt hàng ({n})",
     noItems: "Chưa có mặt hàng nào. Thêm sản phẩm thủ công hoặc quét hóa đơn.",
@@ -301,6 +320,11 @@ const vi: Strings = {
     itemAdded: "Đã thêm mặt hàng vào thực phẩm", cleared: "Đã xóa thực phẩm",
     ocrFailed: "OCR thất bại: {error}", matchFailed: "Kiểm tra thất bại: {error}",
     addedFromReceipt: "Đã thêm {n} mặt hàng từ hóa đơn",
+    closedRecallsTitle: "Sản Phẩm Đã Thu Hồi Trước Đây",
+    closedRecallsHint: "Các đợt thu hồi này đã kết thúc. Nếu bạn mua sản phẩm trước ngày kết thúc, hãy vứt bỏ.",
+    recallClosed: "Thu Hồi Đã Đóng",
+    discardIfBefore: "Vứt bỏ nếu mua trước {date}",
+    discardIfPurchased: "Vứt bỏ bất kỳ sản phẩm nào mua trong thời gian thu hồi.",
   },
   alerts: {
     title: "Lịch sử cảnh báo", total: "Tổng cảnh báo",
@@ -378,6 +402,7 @@ const zh: Strings = {
     newestFirst: "最新优先", oldestFirst: "最旧优先",
     statusAll: "全部", statusActive: "活跃", statusInactive: "非活跃",
     checkPantry: "对照召回检查我的食品",
+    searchPlaceholder: "按产品、品牌或原因搜索召回…",
     loadFailed: "服务器正在启动中，最多需要一分钟。请稍后刷新页面。",
     noResults: "没有找到符合筛选条件的召回。",
     prev: "← 上一页", next: "下一页 →",
@@ -395,7 +420,8 @@ const zh: Strings = {
     exportCsv: "导出 CSV", clear: "清空",
     clearConfirm: "清空所有 {n} 件食品？",
     noMatchFound: "未找到匹配项 — 您的食品看起来安全。",
-    matchesFound: "找到 {n} 个潜在匹配项",
+    noActiveMatches: "无活跃召回 — 请参阅下方已关闭的召回。",
+    matchesFound: "找到 {n} 个活跃召回匹配项",
     yourItems: "您的商品：{items}",
     itemsCount: "商品（{n}）",
     noItems: "暂无商品。手动添加产品或扫描收据。",
@@ -403,6 +429,11 @@ const zh: Strings = {
     itemAdded: "商品已添加到食品", cleared: "食品已清空",
     ocrFailed: "OCR失败：{error}", matchFailed: "匹配失败：{error}",
     addedFromReceipt: "已从收据添加 {n} 件商品",
+    closedRecallsTitle: "曾被召回的产品",
+    closedRecallsHint: "这些召回已关闭。如果您在召回结束前购买了相关产品，请将其丢弃。",
+    recallClosed: "召回已关闭",
+    discardIfBefore: "如在 {date} 前购买请丢弃",
+    discardIfPurchased: "请丢弃在召回期间购买的任何产品。",
   },
   alerts: {
     title: "警报历史", total: "总警报数",
@@ -480,6 +511,7 @@ const ko: Strings = {
     newestFirst: "최신순", oldestFirst: "오래된 순",
     statusAll: "전체", statusActive: "활성", statusInactive: "비활성",
     checkPantry: "이 리콜에 대해 내 식품 보관함 확인",
+    searchPlaceholder: "제품, 브랜드 또는 사유로 리콜 검색…",
     loadFailed: "서버가 시작되는 중입니다 — 최대 1분 정도 걸릴 수 있습니다. 잠시 후 새로고침해 주세요.",
     noResults: "이 필터에 맞는 리콜이 없습니다.",
     prev: "← 이전", next: "다음 →",
@@ -497,7 +529,8 @@ const ko: Strings = {
     exportCsv: "CSV 내보내기", clear: "비우기",
     clearConfirm: "식품 보관함의 {n}개 항목을 모두 비우시겠습니까?",
     noMatchFound: "일치 항목 없음 — 식품 보관함이 안전해 보입니다.",
-    matchesFound: "{n}개의 잠재적 일치 항목 발견",
+    noActiveMatches: "활성 리콜 없음 — 아래에서 종료된 리콜을 확인하세요.",
+    matchesFound: "{n}개의 활성 리콜 일치 항목 발견",
     yourItems: "내 항목: {items}",
     itemsCount: "항목 ({n})",
     noItems: "아직 항목이 없습니다. 제품을 직접 추가하거나 영수증을 스캔하세요.",
@@ -505,6 +538,11 @@ const ko: Strings = {
     itemAdded: "식품 보관함에 항목 추가됨", cleared: "식품 보관함 비움",
     ocrFailed: "OCR 실패: {error}", matchFailed: "대조 실패: {error}",
     addedFromReceipt: "영수증에서 {n}개 항목 추가됨",
+    closedRecallsTitle: "이전에 리콜된 제품",
+    closedRecallsHint: "이 리콜은 종료되었습니다. 종료 날짜 이전에 구매한 제품이 있다면 폐기하세요.",
+    recallClosed: "리콜 종료",
+    discardIfBefore: "{date} 이전 구매 시 폐기",
+    discardIfPurchased: "리콜 기간 중 구매한 제품은 모두 폐기하세요.",
   },
   alerts: {
     title: "경보 기록", total: "총 경보 수",
@@ -582,6 +620,7 @@ const fr: Strings = {
     newestFirst: "Plus récents d'abord", oldestFirst: "Plus anciens d'abord",
     statusAll: "Tous", statusActive: "Actif", statusInactive: "Inactif",
     checkPantry: "Vérifier mon garde-manger contre ces rappels",
+    searchPlaceholder: "Rechercher par produit, marque ou raison…",
     loadFailed: "Le serveur démarre — cela peut prendre jusqu'à une minute. Veuillez rafraîchir dans un instant.",
     noResults: "Aucun rappel trouvé pour ces filtres.",
     prev: "← Préc", next: "Suiv →",
@@ -599,7 +638,8 @@ const fr: Strings = {
     exportCsv: "Exporter CSV", clear: "Vider",
     clearConfirm: "Vider les {n} articles du garde-manger ?",
     noMatchFound: "Aucune correspondance — votre garde-manger semble sûr.",
-    matchesFound: "{n} correspondance(s) potentielle(s) trouvée(s)",
+    noActiveMatches: "Aucun rappel actif — voir ci-dessous les rappels clôturés.",
+    matchesFound: "{n} rappel(s) actif(s) trouvé(s)",
     yourItems: "Vos articles : {items}",
     itemsCount: "Articles ({n})",
     noItems: "Aucun article pour l'instant. Ajoutez des produits manuellement ou scannez un reçu.",
@@ -607,6 +647,11 @@ const fr: Strings = {
     itemAdded: "Article ajouté au garde-manger", cleared: "Garde-manger vidé",
     ocrFailed: "Échec OCR : {error}", matchFailed: "Échec de vérification : {error}",
     addedFromReceipt: "{n} articles ajoutés depuis le reçu",
+    closedRecallsTitle: "Produits Précédemment Rappelés",
+    closedRecallsHint: "Ces rappels sont clôturés. Si vous avez acheté ces produits avant la date de clôture, veuillez les jeter.",
+    recallClosed: "Rappel Clôturé",
+    discardIfBefore: "Jetez si acheté avant le {date}",
+    discardIfPurchased: "Jetez toute unité achetée pendant la période de rappel.",
   },
   alerts: {
     title: "Historique des alertes", total: "Total des alertes",

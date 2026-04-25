@@ -196,14 +196,20 @@ def _candidate_filter(
     """
     # Use only the primary product name portion — strip ingredient lists before tokenizing
     recall_tokens: set = set()
-    recall_norms: set = set()  # collapsed normalized forms for fuzzy matching
+    recall_norms: set = set()  # collapsed normalized forms (kept for legacy)
+    recall_spaceless: set = set()  # raw spaceless forms for substring matching
     for p in parsed_recall.get("products", []):
         clean = _extract_product_name(p)
-        recall_tokens |= _tokenize(clean)
+        # Split CamelCase before tokenizing so "ReadyMeal" → {"ready", "meal"}
+        camel_split = _re.sub(r"([a-z])([A-Z])", r"\1 \2", clean)
+        recall_tokens |= _tokenize(camel_split)
         recall_norms.add(_normalize_name(clean))
+        recall_spaceless.add(_re.sub(r"[^a-z0-9]", "", camel_split.lower()))
     for b in parsed_recall.get("brands", []):
-        recall_tokens |= _tokenize(b)
+        camel_split = _re.sub(r"([a-z])([A-Z])", r"\1 \2", b)
+        recall_tokens |= _tokenize(camel_split)
         recall_norms.add(_normalize_name(b))
+        recall_spaceless.add(_re.sub(r"[^a-z0-9]", "", camel_split.lower()))
 
     recall_brands = {b.lower().strip() for b in parsed_recall.get("brands", []) if b}
     recall_lots = {lc.lower().strip() for lc in parsed_recall.get("lot_codes", []) if lc}
@@ -211,10 +217,12 @@ def _candidate_filter(
     candidates = []
     for idx, item in enumerate(pantry_items):
         item_name = item.get("product_name", "")
-        item_tokens = _tokenize(item_name)
+        # Split CamelCase for pantry items too so "ReadyMeal" → {"ready", "meal"}
+        item_camel = _re.sub(r"([a-z])([A-Z])", r"\1 \2", item_name)
+        item_tokens = _tokenize(item_camel)
         item_norm = _normalize_name(item_name)
         if item.get("brand"):
-            item_tokens |= _tokenize(item["brand"])
+            item_tokens |= _tokenize(_re.sub(r"([a-z])([A-Z])", r"\1 \2", item["brand"]))
         item_brand = (item.get("brand") or "").lower().strip()
         item_lot = (item.get("lot_code") or "").lower().strip()
 
@@ -225,17 +233,15 @@ def _candidate_filter(
             candidates.append(idx)
             continue
 
-        # Fuzzy collapsed-name check: "Ready Meals", "Ready Meal", "readymeal",
-        # "ReadyMeals" all collapse to a spaceless lowercase string for comparison.
+        # Fuzzy spaceless check: "Ready Meals", "Ready Meal", "readymeal", "ReadyMeals"
+        # all strip to "readymeal" and are compared against the raw spaceless recall strings
+        # (not recall_norms, which is sorted+joined and would be "mealready" — wrong order).
         item_spaceless = _re.sub(r"[^a-z0-9]", "", item_name.lower())
         if item_spaceless and len(item_spaceless) >= 4:
-            for rn in recall_norms:
-                rn_spaceless = _re.sub(r"[^a-z0-9]", "", rn)
-                if item_spaceless in rn_spaceless or rn_spaceless.startswith(item_spaceless) or rn_spaceless.endswith(item_spaceless):
+            for rs in recall_spaceless:
+                if item_spaceless in rs or rs in item_spaceless:
                     candidates.append(idx)
                     break
-            else:
-                pass  # fall through to token overlap check below
             if idx in candidates:
                 continue
 
@@ -416,11 +422,25 @@ def ocr_receipt(image_bytes: bytes) -> List[Dict[str, str]]:
     Returns list of dicts: {"product_name": ..., "brand": ..., "lot_code": ...}
     """
     prompt = (
-        "You are an OCR assistant that reads grocery receipts. "
-        "Extract every food/grocery product from this receipt image. "
+        "You are a grocery receipt OCR assistant. "
+        "Grocery receipts use heavy abbreviations and truncated text. "
+        "Your job is to extract every food/grocery product and EXPAND each abbreviated receipt line "
+        "into its full, common product name and brand that a consumer would recognize.\n\n"
+        "Rules:\n"
+        "- Expand abbreviations: 'JZF PEANUT BUTR' → product_name='Peanut Butter', brand='Jif'\n"
+        "- Expand abbreviations: 'CAMPBLL CHSN SOP' → product_name='Chicken Noodle Soup', brand=\"Campbell's\"\n"
+        "- Expand abbreviations: 'READYML TURK BCN' → product_name='Ready Meal Turkey Bacon', brand=null\n"
+        "- Expand abbreviations: 'GY LG EGGS 12CT' → product_name='Large Eggs 12 Count', brand=null\n"
+        "- Expand abbreviations: 'KELLOGG CORNFLK' → product_name='Corn Flakes', brand='Kellogg\\'s'\n"
+        "- Expand abbreviations: 'QUAKR GRNO BAR6' → product_name='Granola Bars', brand='Quaker'\n"
+        "- Expand abbreviations: 'DNNON VANILLA YG' → product_name='Vanilla Yogurt', brand='Dannon'\n"
+        "- Expand abbreviations: 'BRTLLA PASTA 16Z' → product_name='Pasta 16oz', brand='Barilla'\n"
+        "- If the brand is embedded in the item name (e.g. first word is a brand abbreviation), separate it out.\n"
+        "- Skip non-food items (cleaning supplies, paper products, soap, detergent, etc.).\n"
+        "- Skip fees, taxes, subtotals, and store loyalty entries.\n\n"
         "Return ONLY a valid JSON array of objects, each with:\n"
-        '  "product_name": the item name,\n'
-        '  "brand": brand if visible (null otherwise),\n'
+        '  "product_name": full expanded product name (no abbreviations),\n'
+        '  "brand": full brand name if identifiable (null otherwise),\n'
         '  "lot_code": lot or batch code if visible (null otherwise)\n\n'
         "If you cannot read the receipt, return an empty array []."
     )

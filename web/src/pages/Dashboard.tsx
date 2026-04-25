@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { fetchRecalls, fetchStats, triggerFetch } from "@/api/client";
@@ -16,7 +16,21 @@ export default function Dashboard() {
   const [status, setStatus] = useState("All");
   const [sort, setSort] = useState<"latest" | "oldest">("latest");
   const [offset, setOffset] = useState(0);
+  const [searchInput, setSearchInput] = useState("");
+  const [q, setQ] = useState("");
   const LIMIT = 20;
+
+  const handleSearch = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    setQ(searchInput.trim());
+    setOffset(0);
+  }, [searchInput]);
+
+  const handleSearchClear = useCallback(() => {
+    setSearchInput("");
+    setQ("");
+    setOffset(0);
+  }, []);
 
   const STATUSES = [
     { label: t("dash.statusAll"), value: "All" },
@@ -34,6 +48,7 @@ export default function Dashboard() {
     source: source !== "All" ? source : undefined,
     status: status !== "All" ? status : undefined,
     sort,
+    q: q || undefined,
   };
 
   const { data, isLoading, isError } = useQuery({
@@ -91,6 +106,29 @@ export default function Dashboard() {
           ))}
         </div>
       )}
+
+      {/* Search bar */}
+      <form onSubmit={handleSearch} className="relative mb-4">
+        <input
+          type="search"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder={t("dash.searchPlaceholder")}
+          className="w-full bg-navy-800 border border-navy-700 text-white placeholder-slate-500 rounded-xl px-4 py-2.5 pr-20 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+        />
+        {q && (
+          <button
+            type="button"
+            onClick={handleSearchClear}
+            className="absolute right-16 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-lg leading-none px-1"
+            aria-label="Clear search"
+          >✕</button>
+        )}
+        <button
+          type="submit"
+          className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-primary-dark transition-colors"
+        >Search</button>
+      </form>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2 mb-4">
